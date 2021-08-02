@@ -8,6 +8,9 @@ import Paper from "@material-ui/core/Paper";
 import CardActions from "@material-ui/core/CardActions";
 import CardContent from "@material-ui/core/CardContent";
 import Button from "@material-ui/core/Button";
+import IconButton from "@material-ui/core/IconButton";
+import ReplayIcon from "@material-ui/icons/Replay";
+import SettingsIcon from "@material-ui/icons/Settings";
 import Typography from "@material-ui/core/Typography";
 import Grid from "@material-ui/core/Grid";
 import { version } from "../package.json";
@@ -66,24 +69,42 @@ interface GameSettings {
   mode: GameMode;
 }
 
-const useQuestions = (themes: Set<Theme>) => {
+const range = (start: number, stop: number, step: number) =>
+  Array.from({ length: (stop - start) / step + 1 }, (_, i) => start + i * step);
+
+function shuffleArray<T>(arr: T[]): T[] {
+  let indices = range(0, arr.length - 1, 1);
+  let result = [];
+  while (indices.length !== 0) {
+    let idx = Math.floor(Math.random() * indices.length);
+    const elem = arr[idx];
+    result.push(elem);
+    indices.splice(idx, 1);
+  }
+  return result;
+}
+
+const useQuestions = (themes: Set<Theme>, shuffled: boolean) => {
   const [questions, setQuestions] = useState<Question[]>([]);
+  const reshuffleQuestions = () => {
+    setQuestions(shuffleArray(questions));
+  };
   useEffect(() => {
     (async () => {
       const module = await import("./questions.json");
       const json = module.default;
       let qst: Question[] = [];
-      console.log(json);
       themes.forEach((t: Theme) => {
         const qq = (json as any)[t] ?? [];
-        console.log(qq);
         for (let q of qq) qst.push(q);
       });
-      console.log(qst);
+      if (shuffled) {
+        qst = shuffleArray(qst);
+      }
       setQuestions(qst);
     })();
   }, [themes]);
-  return questions;
+  return { questions, reshuffleQuestions };
 };
 
 const useThemes = () => {
@@ -146,7 +167,7 @@ const ConfigurationScreen = (props: {
           //const background = randomCSSColor();
           const isSelected = gameSettings.themes.has(theme);
           return (
-            <Grid item xs={3}>
+            <Grid item xs={3} key={theme}>
               <Paper
                 elevation={2}
                 className={cn({ "theme-card": true, "theme-card_selected": isSelected })}
@@ -189,8 +210,17 @@ const ScreenContent = (props: { children: any }) => {
   return <div className="screen-content">{props.children}</div>;
 };
 
-const ScreenContentHeader = (props: { children: any }) => {
-  return <div className="screen-content-header">{props.children}</div>;
+const ScreenContentHeader = (props: { title: string; children?: any }) => {
+  return (
+    <div className="screen-content-header">
+      <div className="flex flex-c flex-100">
+        <Typography variant="h5" component="h2">
+          {props.title}
+        </Typography>
+      </div>
+      {props.children}
+    </div>
+  );
 };
 
 interface PlayScreenProps {
@@ -200,11 +230,10 @@ interface PlayScreenProps {
 
 const Play = (props: PlayScreenProps) => {
   const { gameSettings } = props;
-  const questions = useQuestions(gameSettings.themes);
+  const { questions, reshuffleQuestions } = useQuestions(gameSettings.themes, true);
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState<number>(-1);
   const currentQuestion: Question | null =
     currentQuestionIdx !== -1 ? questions[currentQuestionIdx] : null;
-  /* console.log(questions); */
   const [userAnswer, setUserAnswer] = useState<string>("");
   const [remainingAttempts, setRemainingAttempts] = useState<number>(3);
   const [properAnsweredQuestions, setProperAnsweredQuestions] = useState<number>(0);
@@ -213,10 +242,7 @@ const Play = (props: PlayScreenProps) => {
     if (currentQuestion === null) return;
     if (userAnswer === "") return;
     const correct = doesAnswerMatchQuestion(currentQuestion, userAnswer);
-    console.log(correct);
     if (correct) {
-      console.log("correct");
-      return;
       setProperAnsweredQuestions(properAnsweredQuestions + 1);
       const finished = currentQuestionIdx === questions.length - 1;
       if (finished) {
@@ -225,8 +251,6 @@ const Play = (props: PlayScreenProps) => {
         setCurrentQuestionIdx(currentQuestionIdx + 1);
       }
     } else {
-      console.log("wrong");
-      return;
       if (remainingAttempts === 0) return;
       setRemainingAttempts(remainingAttempts - 1);
     }
@@ -244,16 +268,14 @@ const Play = (props: PlayScreenProps) => {
     setCurrentQuestionIdx(0);
     setRemainingAttempts(3);
     setUserAnswer("");
+    reshuffleQuestions();
   };
+
   if (lost) {
     return (
       <Screen title="You lost!">
         <ScreenContent>
-          <ScreenContentHeader>
-            <Typography variant="h5" component="h2">
-              You Lost!
-            </Typography>
-          </ScreenContentHeader>
+          <ScreenContentHeader title="You Lost!"></ScreenContentHeader>
           <div>
             <span>Proper answered questions: </span>
             <span>
@@ -280,10 +302,23 @@ const Play = (props: PlayScreenProps) => {
   return (
     <Screen title="Playing">
       <ScreenContent>
-        <ScreenContentHeader>
-          <Typography variant="h5" component="h2">
-            Answer
-          </Typography>
+        <ScreenContentHeader title="Answer">
+          <IconButton
+            color="secondary"
+            aria-label="Restart the game"
+            title="Restart the game"
+            onClick={reset}
+          >
+            <ReplayIcon />
+          </IconButton>
+          <IconButton
+            color="secondary"
+            aria-label="Reconfigure"
+            title="Reconfigure"
+            onClick={props.gotoSettings}
+          >
+            <SettingsIcon />
+          </IconButton>
         </ScreenContentHeader>
         <div className="answer-screen-content">
           <div>
@@ -330,7 +365,6 @@ const Header = () => {
     </header>
   );
 };
-
 
 const App = () => {
   // TODO: Maybe load previous game state if user refreshes on accident

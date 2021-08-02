@@ -68,7 +68,8 @@ html, body {
   min-width: 800px;
   height: 600px;
   background: #fff;
-  padding: 28px;
+  padding: 20px;
+  padding-top: 0;
   max-width: 800px;
   display: flex;
   flex-direction: column;
@@ -91,7 +92,7 @@ html, body {
 
 .screen-content-header {
   display: flex;
-  justify-content: center;
+  flex-direction: row;
   padding: 16px 0;
 }
 
@@ -101,6 +102,10 @@ html, body {
 
 .flex-ch {
   justify-content: center;
+}
+
+.flex-100 {
+  flex: 1 1 100%;
 }
 
 .flex-c {
