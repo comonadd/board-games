@@ -34,6 +34,22 @@ const cn = (...cns: CNArg[]): string => {
   return res;
 };
 
+function useLocalStorageState<T>(
+  key: string,
+  initialValue: T,
+  sTransformer: (v: T) => any,
+  dTransformer: (v: any) => T,
+): [T, (v: T) => void] {
+  const localStorageItem = localStorage.getItem(key);
+  const [data, setData] = useState<T>(
+    localStorageItem ? dTransformer(JSON.parse(localStorageItem)) : initialValue,
+  );
+  useEffect(() => {
+    localStorage.setItem(key, JSON.stringify(sTransformer(data)));
+  }, [data]);
+  return [data, setData];
+}
+
 interface Question {
   text: string;
   answer: string;
@@ -91,10 +107,10 @@ const doesAnswerMatchQuestion = (question: Question, answer: string): boolean =>
   const userAnswerWords = userAnswer.split(" ");
   // Remove all articles if the answer is longer than 1 word
   if (rightAnswerWords.length > 1) {
-    rightAnswer = rightAnswerWords.filter(w => !articles.has(w)).join(" ");
+    rightAnswer = rightAnswerWords.filter((w) => !articles.has(w)).join(" ");
   }
   if (userAnswerWords.length > 1) {
-    userAnswer = userAnswerWords.filter(w => !articles.has(w)).join(" ");
+    userAnswer = userAnswerWords.filter((w) => !articles.has(w)).join(" ");
   }
   // TODO: Maybe use the edit distance to determine correctness?
   return rightAnswer === userAnswer;
@@ -199,7 +215,7 @@ const Play = (props: PlayScreenProps) => {
     const correct = doesAnswerMatchQuestion(currentQuestion, userAnswer);
     console.log(correct);
     if (correct) {
-      console.log('correct');
+      console.log("correct");
       return;
       setProperAnsweredQuestions(properAnsweredQuestions + 1);
       const finished = currentQuestionIdx === questions.length - 1;
@@ -209,7 +225,7 @@ const Play = (props: PlayScreenProps) => {
         setCurrentQuestionIdx(currentQuestionIdx + 1);
       }
     } else {
-      console.log('wrong');
+      console.log("wrong");
       return;
       if (remainingAttempts === 0) return;
       setRemainingAttempts(remainingAttempts - 1);
@@ -278,7 +294,8 @@ const Play = (props: PlayScreenProps) => {
           </div>
           <div>
             <div className="mb-4">
-              <b>Answer:</b><br/>
+              <b>Answer:</b>
+              <br />
               <div>{remainingAttempts} attempts remaining</div>
               <Input
                 onKeyDown={(e) => {
@@ -314,13 +331,25 @@ const Header = () => {
   );
 };
 
+
 const App = () => {
   // TODO: Maybe load previous game state if user refreshes on accident
   const [step, setStep] = useState<Step>(Step.ConfiguringGame);
-  const [gameSettings, setGameSettings] = useState<GameSettings>({
-    themes: new Set(),
-    mode: GameMode.Normal,
-  });
+  const [gameSettings, setGameSettings] = useLocalStorageState<GameSettings>(
+    "gameSettings",
+    {
+      themes: new Set(),
+      mode: GameMode.Normal,
+    },
+    (v: GameSettings) => ({
+      themes: Array.from(v.themes),
+      mode: v.mode,
+    }),
+    (v) => ({
+      themes: new Set(v.themes),
+      mode: v.mode,
+    }),
+  );
   const game = (() => {
     switch (step) {
       case Step.Playing:
