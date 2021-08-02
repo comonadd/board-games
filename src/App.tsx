@@ -4,11 +4,13 @@ import ReactDOM from "react-dom";
 import Input from "@material-ui/core/Input";
 import "./App.css";
 import Card from "@material-ui/core/Card";
+import Paper from "@material-ui/core/Paper";
 import CardActions from "@material-ui/core/CardActions";
 import CardContent from "@material-ui/core/CardContent";
 import Button from "@material-ui/core/Button";
 import Typography from "@material-ui/core/Typography";
 import Grid from "@material-ui/core/Grid";
+import { version } from "../package.json";
 
 type CNArg = string[] | Record<string, boolean>;
 const cn = (...cns: CNArg[]): string => {
@@ -34,7 +36,7 @@ const cn = (...cns: CNArg[]): string => {
 
 interface Question {
   text: string;
-  answer: string | number;
+  answer: string;
 }
 
 type Theme = string;
@@ -80,8 +82,22 @@ const useThemes = () => {
   return themes;
 };
 
+const articles = new Set(["the", "an", "a"]);
+
 const doesAnswerMatchQuestion = (question: Question, answer: string): boolean => {
-  return question.answer === answer;
+  let rightAnswer = question.answer.toLowerCase();
+  let userAnswer = answer.toLowerCase();
+  const rightAnswerWords = rightAnswer.split(" ");
+  const userAnswerWords = userAnswer.split(" ");
+  // Remove all articles if the answer is longer than 1 word
+  if (rightAnswerWords.length > 1) {
+    rightAnswer = rightAnswerWords.filter(w => !articles.has(w)).join(" ");
+  }
+  if (userAnswerWords.length > 1) {
+    userAnswer = userAnswerWords.filter(w => !articles.has(w)).join(" ");
+  }
+  // TODO: Maybe use the edit distance to determine correctness?
+  return rightAnswer === userAnswer;
 };
 
 const randomColor = () => {
@@ -105,8 +121,8 @@ const ConfigurationScreen = (props: {
   const themes = useThemes();
   const { gameSettings } = props;
   return (
-    <div className="choose-theme">
-      <Typography variant="h4" component="h2">
+    <Screen title="Configure the game">
+      <Typography className="screen-title" variant="h4" component="h2">
         Select themes
       </Typography>
       <Grid container spacing={2} className="theme-grid">
@@ -115,7 +131,7 @@ const ConfigurationScreen = (props: {
           const isSelected = gameSettings.themes.has(theme);
           return (
             <Grid item xs={3}>
-              <Card
+              <Paper
                 elevation={2}
                 className={cn({ "theme-card": true, "theme-card_selected": isSelected })}
                 onClick={() => {
@@ -133,12 +149,8 @@ const ConfigurationScreen = (props: {
                   }
                 }}
               >
-                <CardContent className="theme-card-content">
-                  <Typography variant="h5" component="h2">
-                    {theme}
-                  </Typography>
-                </CardContent>
-              </Card>
+                {theme}
+              </Paper>
             </Grid>
           );
         })}
@@ -146,7 +158,7 @@ const ConfigurationScreen = (props: {
       <Button onClick={props.onPlay} variant="contained" size="large" color="primary">
         Play the game
       </Button>
-    </div>
+    </Screen>
   );
 };
 
@@ -187,6 +199,8 @@ const Play = (props: PlayScreenProps) => {
     const correct = doesAnswerMatchQuestion(currentQuestion, userAnswer);
     console.log(correct);
     if (correct) {
+      console.log('correct');
+      return;
       setProperAnsweredQuestions(properAnsweredQuestions + 1);
       const finished = currentQuestionIdx === questions.length - 1;
       if (finished) {
@@ -195,6 +209,8 @@ const Play = (props: PlayScreenProps) => {
         setCurrentQuestionIdx(currentQuestionIdx + 1);
       }
     } else {
+      console.log('wrong');
+      return;
       if (remainingAttempts === 0) return;
       setRemainingAttempts(remainingAttempts - 1);
     }
@@ -246,27 +262,40 @@ const Play = (props: PlayScreenProps) => {
   }
 
   return (
-    <Screen title="You lost!">
+    <Screen title="Playing">
       <ScreenContent>
         <ScreenContentHeader>
           <Typography variant="h5" component="h2">
             Answer
           </Typography>
         </ScreenContentHeader>
-        <b>Question:</b>
-        <Typography variant="h6" component="h2">{currentQuestion.text}</Typography>
-        <b>Answer:</b>
-        <Input
-          onKeyDown={(e) => {
-            if (e.which === 13) onAnswer();
-          }}
-          className="input-field"
-          onChange={(e) => setUserAnswer(e.target.value)}
-        />
-        <div>
-          <b>Themes:</b> {new Array(gameSettings.themes).map((a) => a)}
+        <div className="answer-screen-content">
+          <div>
+            <b>Question:</b>
+            <Typography variant="h6" component="h2">
+              {currentQuestion.text}
+            </Typography>
+          </div>
+          <div>
+            <div className="mb-4">
+              <b>Answer:</b><br/>
+              <div>{remainingAttempts} attempts remaining</div>
+              <Input
+                onKeyDown={(e) => {
+                  if (e.which === 13) onAnswer();
+                }}
+                className="w-100"
+                onChange={(e) => setUserAnswer(e.target.value)}
+              />
+            </div>
+            <div>
+              <b>Themes:</b>{" "}
+              {Array.from(gameSettings.themes)
+                .map((a) => a)
+                .join(", ")}
+            </div>
+          </div>
         </div>
-        <div>Remaining attempts: {remainingAttempts}</div>
       </ScreenContent>
     </Screen>
   );
@@ -276,6 +305,14 @@ enum Step {
   ConfiguringGame = 0,
   Playing = 1,
 }
+
+const Header = () => {
+  return (
+    <header className="header">
+      <div className="logo flex flex-c">Quiz Game v{version}</div>
+    </header>
+  );
+};
 
 const App = () => {
   // TODO: Maybe load previous game state if user refreshes on accident
@@ -314,7 +351,7 @@ const App = () => {
   const canPlay = gameSettings.themes.size !== 0;
   return (
     <div className="app">
-      <header className="header">This is supposed to be a Header</header>
+      <Header />
       {game}
     </div>
   );
