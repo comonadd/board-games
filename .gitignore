@@ -6,3 +6,6 @@ dist-ssr
 question_sources/
 src/questions.json
 src/themes.json
+public
+__pycache__
+russian-words/
