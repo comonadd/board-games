@@ -9,6 +9,7 @@ routes = web.RouteTableDef()
 
 TIME_UNTIL_START = 4
 LIVES_INITIAL = 3
+MIN_PLAYERS_TO_START_GAME = 1
 
 class CWMSG:
   Joining = 0
@@ -97,7 +98,7 @@ async def on_player_joined(W, gs, si, parsed):
     "id": ws_id,
   }
   await notify_of_su(W, "players")
-  if len(gs["players"]) >= 2:
+  if len(gs["players"]) >= MIN_PLAYERS_TO_START_GAME:
     await start_game(W)
   await send_to_user(si, { "type": SWMSG.InitGame, "state": gs })
 

@@ -1,0 +1,14 @@
+aiohttp==3.7.4.post0
+aiohttp-devtools==0.13.1
+async-timeout==3.0.1
+attrs==21.2.0
+chardet==4.0.0
+click==8.0.1
+colorama==0.4.4
+devtools==0.6.1
+idna==3.2
+multidict==5.1.0
+Pygments==2.9.0
+typing-extensions==3.10.0.0
+watchgod==0.7
+yarl==1.6.3
