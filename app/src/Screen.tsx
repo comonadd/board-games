@@ -1,17 +1,18 @@
-import { useEffect } from "react";
+import React, { useEffect } from "react";
+import Typography from "@material-ui/core/Typography";
 
-const Screen = (props: { title: string; children: any }) => {
+export const Screen = (props: { title: string; children: any }) => {
   useEffect(() => {
     document.title = props.title;
   }, [props.title]);
   return <div className="screen">{props.children}</div>;
 };
 
-const ScreenContent = (props: { children: any }) => {
+export const ScreenContent = (props: { children: any }) => {
   return <div className="screen-content">{props.children}</div>;
 };
 
-const ScreenContentHeader = (props: { title: string; children?: any }) => {
+export const ScreenContentHeader = (props: { title: string; children?: any }) => {
   return (
     <div className="screen-content-header">
       <div className="flex flex-c flex-100">

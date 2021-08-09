@@ -1,6 +1,7 @@
+import { useEffect, useState } from "react";
 
 type CNArg = string[] | Record<string, boolean>;
-const cn = (...cns: CNArg[]): string => {
+export const cn = (...cns: CNArg[]): string => {
   let res = "";
   for (let i = 0; i < cns.length; ++i) {
     const cn = cns[i];
@@ -21,7 +22,7 @@ const cn = (...cns: CNArg[]): string => {
   return res;
 };
 
-function useLocalStorageState<T>(
+export function useLocalStorageState<T>(
   key: string,
   initialValue: T,
   sTransformer: (v: T) => any,
@@ -37,10 +38,10 @@ function useLocalStorageState<T>(
   return [data, setData];
 }
 
-const range = (start: number, stop: number, step: number) =>
+export const range = (start: number, stop: number, step: number) =>
   Array.from({ length: (stop - start) / step + 1 }, (_, i) => start + i * step);
 
-function shuffleArray<T>(arr: T[]): T[] {
+export function shuffleArray<T>(arr: T[]): T[] {
   let indices = range(0, arr.length - 1, 1);
   let result = [];
   while (indices.length !== 0) {
@@ -53,17 +54,18 @@ function shuffleArray<T>(arr: T[]): T[] {
 }
 
 
-type Milliseconds = number;
-type Seconds = number;
+export type Milliseconds = number;
+export type Seconds = number;
 
-interface Timer {
+export interface Timer {
   reset: () => void;
   stop: () => void;
   start: () => void;
   current: Milliseconds;
+  finished: boolean;
 }
-const timerSeconds = (t: Timer) => Math.round(t.current / 1000);
-const useMSTimer = (
+export const timerSeconds = (t: Timer) => Math.round(t.current / 1000);
+export const useMSTimer = (
   tickDuration: Milliseconds,
   countTo: Milliseconds,
   countDown: boolean = true,
@@ -84,8 +86,8 @@ const useMSTimer = (
       } else {
         setCurrent(current + tickDuration);
       }
-    }, [tickDuration]);
-  }, [stopped, current]);
+    }, tickDuration);
+  }, [tickDuration, stopped, current]);
   const reset = () => {
     setCurrent(initialTime);
     setStopped(false);

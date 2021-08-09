@@ -1,4 +1,32 @@
-import { useEffect, useState, useCallback } from 'react';
+import logo from "./logo.svg";
+import React, { useCallback, useRef, useState, useEffect } from "react";
+import ReactDOM from "react-dom";
+import Input from "@material-ui/core/Input";
+import "./App.css";
+import Card from "@material-ui/core/Card";
+import Paper from "@material-ui/core/Paper";
+import CardActions from "@material-ui/core/CardActions";
+import CardContent from "@material-ui/core/CardContent";
+import Button from "@material-ui/core/Button";
+import IconButton from "@material-ui/core/IconButton";
+import ReplayIcon from "@material-ui/icons/Replay";
+import SettingsIcon from "@material-ui/icons/Settings";
+import Typography from "@material-ui/core/Typography";
+import Grid from "@material-ui/core/Grid";
+import { version } from "../package.json";
+import { Link, BrowserRouter as Router, Route, Switch } from "react-router-dom";
+import FavoriteIcon from "@material-ui/icons/Favorite";
+import ArrowRightAltIcon from "@material-ui/icons/ArrowRightAlt";
+import { Screen, ScreenContent, ScreenContentHeader } from "./Screen";
+import {
+  useLocalStorageState,
+  cn,
+  shuffleArray,
+  Seconds,
+  Milliseconds,
+  timerSeconds,
+  useMSTimer,
+} from "./util";
 
 interface Question {
   text: string;
@@ -172,7 +200,7 @@ const Play = (props: PlayScreenProps) => {
     const correct = doesAnswerMatchQuestion(currentQuestion, userAnswer);
     if (correct) {
       setProperAnsweredQuestions(properAnsweredQuestions + 1);
-      const timeTookToAnswer = timeSpent;
+      const timeTookToAnswer = TIME_TO_ANSWER_QUESTION - timer.current;
       const timeK = timeTookToAnswer / timeToAnswer;
       const questionDifficulty = 1.0;
       setTotalPoints(timeK * questionDifficulty * POINTS_PER_ANSWER);
@@ -311,7 +339,6 @@ const Play = (props: PlayScreenProps) => {
   );
 };
 
-
 const QuizGame = () => {
   // TODO: Maybe load previous game state if user refreshes on accident
   const [step, setStep] = useState<Step>(Step.ConfiguringGame);
@@ -325,7 +352,7 @@ const QuizGame = () => {
       themes: Array.from(v.themes),
       mode: v.mode,
     }),
-    (v) => ({
+    (v: any) => ({
       themes: new Set(v.themes),
       mode: v.mode,
     }),
@@ -360,3 +387,5 @@ const QuizGame = () => {
   const canPlay = gameSettings.themes.size !== 0;
   return game;
 };
+
+export default QuizGame;
