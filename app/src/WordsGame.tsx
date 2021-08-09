@@ -1,3 +1,24 @@
+import logo from "./logo.svg";
+import React, { useCallback, useRef, useState, useEffect } from "react";
+import ReactDOM from "react-dom";
+import Input from "@material-ui/core/Input";
+import "./App.css";
+import Card from "@material-ui/core/Card";
+import Paper from "@material-ui/core/Paper";
+import CardActions from "@material-ui/core/CardActions";
+import CardContent from "@material-ui/core/CardContent";
+import Button from "@material-ui/core/Button";
+import IconButton from "@material-ui/core/IconButton";
+import ReplayIcon from "@material-ui/icons/Replay";
+import SettingsIcon from "@material-ui/icons/Settings";
+import Typography from "@material-ui/core/Typography";
+import Grid from "@material-ui/core/Grid";
+import { version } from "../package.json";
+import { Link, BrowserRouter as Router, Route, Switch } from "react-router-dom";
+import FavoriteIcon from "@material-ui/icons/Favorite";
+import ArrowRightAltIcon from "@material-ui/icons/ArrowRightAlt";
+import { cn } from "./util";
+import { Screen, ScreenContent } from "./Screen";
 
 const WS_WORDS_API_URL = `ws://${location.hostname}:8080/words/`;
 
@@ -20,14 +41,17 @@ enum GameStateDesc {
   WaitingForPlayers = 0,
   Playing = 1,
   Starting = 2,
+  Ended = 3,
 }
 
 interface WordsGameState {
   players: Record<PlayerId, PlayerInfo>;
   whos_turn: PlayerId;
-  particle: string;
+  start_timer: number;
+  particle: string | null;
   user_input: string;
   desc: GameStateDesc;
+  last_player_to_answer: PlayerId | null;
 }
 
 enum WordsGameStep {
@@ -36,37 +60,63 @@ enum WordsGameStep {
   Playing = 2,
 }
 
-interface Message extends any {
+interface Message extends Record<string, any> {
   type: CWMSG;
 }
+
+const emptyGameState = (): WordsGameState | null => {
+  return null;
+};
 
 const WordsGame = () => {
   const [nickname, setNickname] = useState<string>("");
   const canJoin = nickname.length !== 0;
   const [step, setStep] = useState<WordsGameStep>(WordsGameStep.Initial);
-  const [gameState, setGameState] = useState<WordsGameState>({});
+  const [gameState, setGameState] = useState<WordsGameState | null>(emptyGameState());
   const [userGuess, setState] = useState<string>("");
+  const resetState = () => setGameState(emptyGameState());
 
   // Socket interaction
-  const [socket, setSocket] = useState<Websocket | null>(null);
+  const socket = useRef<WebSocket | null>(null);
+  const onOpen = (event: any) => {};
+  const onClose = (event: any) => {
+    resetState();
+    setStep(WordsGameStep.Initial);
+    initSocket();
+  };
   const initSocket = () => {
-    setSocket(new WebSocket(WS_WORDS_API_URL));
-  }
+    socket.current = new WebSocket(WS_WORDS_API_URL);
+    socket.current.addEventListener("open", onOpen);
+    socket.current.addEventListener("close", onClose);
+  };
+  const socketSend = (m: Message) => socket.current!.send(JSON.stringify(m));
+
+  const join = () => {
+    setStep(WordsGameStep.Joining);
+    socketSend({ type: CWMSG.Joining, nickname });
+  };
+
   useEffect(() => {
     initSocket();
   }, []);
-  const onOpen = useCallback((event) => {}, []);
-  const onClose = useCallback((event) => {
-    setGameState({});
-    setStep(WordsGameStep.Initial);
-    console.log('on-close');
-    initSocket();
-  }, []);
-  const onMessage = useCallback(
-    (event) => {
-      console.log("Message from server ", event.data);
-      console.log(gameState);
+
+  const [messageHistory, setMessageHistory] = useState<Message[]>([]);
+
+  useEffect(() => {
+    const onMessage = (event) => {
       const parsed = JSON.parse(event.data);
+      setMessageHistory([...messageHistory, parsed]);
+    };
+    socket.current!.addEventListener("message", onMessage);
+    return () => {
+      socket.current!.removeEventListener("message", onMessage);
+    };
+  }, [messageHistory]);
+
+  useEffect(() => {
+    if (messageHistory.length === 0) return;
+    for (let i = 0; i < messageHistory.length; ++i) {
+      const parsed = messageHistory[i];
       console.log(parsed);
       switch (parsed.type) {
         case SWMSG.InitGame:
@@ -86,31 +136,16 @@ const WordsGame = () => {
           }
           break;
       }
-    },
-    [gameState],
-  );
-  useEffect(() => {
-    if (socket === null) return;
-    console.log("re-binding");
-    socket.addEventListener("open", onOpen);
-    socket.addEventListener("message", onMessage);
-    socket.addEventListener("close", onClose);
-    return () => {
-      socket.removeEventListener("open", onOpen);
-      socket.removeEventListener("message", onMessage);
-      socket.removeEventListener("close", onClose);
-    };
-  }, [socket, onOpen, onMessage]);
-
-  const socketSend = (m: Message) => socket.send(JSON.stringify(m));
-
-  const join = () => {
-    setStep(WordsGameStep.Joining);
-    socketSend({ type: CWMSG.Joining, nickname });
-  };
+    }
+    setMessageHistory([]);
+  }, [messageHistory]);
 
   useEffect(() => {
-    console.log(gameState);
+    if (gameState === null) {
+      setStep(WordsGameStep.Initial);
+      return;
+    }
+    /* console.log(gameState); */
     switch (gameState.desc) {
       case GameStateDesc.WaitingForPlayers:
         {
@@ -158,13 +193,15 @@ const WordsGame = () => {
         break;
       case WordsGameStep.Playing:
         {
+          if (gameState === null) return;
           const gameScreen = (
             <div>
               <h1>Game</h1>
               <div>
                 <div>Players:</div>
-                {Object.keys(gameState?.players).map((playerId) => {
-                  const player = gameState.players[playerId];
+                {Object.keys(gameState?.players || {}).map((pidS) => {
+                  const playerId = Number(pidS);
+                  const player = (gameState.players as any)[playerId];
                   const dead = player.lives_left === 0;
                   let hearts = [];
                   for (let i = 0; i < player.lives_left; ++i) hearts.push(<FavoriteIcon key={i} />);
@@ -207,11 +244,24 @@ const WordsGame = () => {
               break;
             case GameStateDesc.Starting:
               {
-                console.log("starting.....");
                 return (
                   <div>
                     <div className="starting-msg">
                       Starting: <span>{gameState.start_timer}</span>
+                    </div>
+                    {gameScreen}
+                  </div>
+                );
+              }
+              break;
+            case GameStateDesc.Ended:
+              {
+                const winnerId = gameState["last_player_to_answer"];
+                const winner = gameState["players"][winnerId];
+                return (
+                  <div>
+                    <div className="game-ended">
+                      Game Ended. Winner is {winner.nickname}
                     </div>
                     {gameScreen}
                   </div>
@@ -238,3 +288,5 @@ const WordsGame = () => {
     </Screen>
   );
 };
+
+export default WordsGame;
