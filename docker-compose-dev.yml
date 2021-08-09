@@ -5,8 +5,8 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - ./app/src:/app/src
-      - ./app/public:/app/public
+      - ./app/src:/app/src/:rw
+      - ./app/public:/app/public/:rw
     links:
       - backend
   backend:
