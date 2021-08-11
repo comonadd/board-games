@@ -3,7 +3,7 @@ services:
   web:
     build: ./app
     ports:
-      - "5000:5000"
+      - "8000:8000"
     volumes:
       - ./app/src:/app/src/:rw
       - ./app/public:/app/public/:rw
@@ -14,4 +14,4 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./server:/backend
+      - ./server:/backend/:rw
