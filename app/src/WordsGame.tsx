@@ -1,5 +1,5 @@
 import logo from "./logo.svg";
-import React, { useCallback, useRef, useState, useEffect } from "react";
+import React, { useMemo, useCallback, useRef, useState, useEffect } from "react";
 import ReactDOM from "react-dom";
 import Input from "@material-ui/core/Input";
 import "./App.css";
@@ -68,9 +68,117 @@ const emptyGameState = (): WordsGameState | null => {
   return null;
 };
 
+const InitialScreen = (props: {
+  nickname: string;
+  onChange: (v: any) => void;
+  join: () => void;
+}) => {
+  const { nickname, onChange, join } = props;
+  const canJoin = nickname.length !== 0;
+  return (
+    <div>
+      <Input
+        onChange={onChange}
+        value={nickname}
+        placeholder="Nickname"
+        className="mr-2"
+        onKeyDown={(e) => {
+          if (e.keyCode === 13 && canJoin) join();
+        }}
+      />
+      <Button disabled={!canJoin} onClick={join} variant="contained" color="primary">
+        Join
+      </Button>
+    </div>
+  );
+};
+
+const GameScreen = (props: { gameState: GameState }) => {
+  const { gameState } = props;
+  if (gameState === null) return;
+  const gameScreen = (
+    <div>
+      <h1>Game</h1>
+      <div>
+        <div>Players:</div>
+        {Object.keys(gameState?.players || {}).map((pidS) => {
+          const playerId = Number(pidS);
+          const player = (gameState.players as any)[playerId];
+          const dead = player.lives_left === 0;
+          let hearts = [];
+          for (let i = 0; i < player.lives_left; ++i) hearts.push(<FavoriteIcon key={i} />);
+          const turn = gameState.whos_turn === playerId;
+          return (
+            <div
+              key={playerId}
+              className={cn({
+                player: true,
+                player_dead: dead,
+              })}
+            >
+              {turn && <ArrowRightAltIcon />}
+              {hearts}
+              <span>{player.nickname}</span>
+              {turn && <span>{gameState.user_input}</span>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+  switch (gameState.desc) {
+    case GameStateDesc.Playing:
+      {
+        return <div>{gameScreen}</div>;
+      }
+      break;
+    case GameStateDesc.WaitingForPlayers:
+      {
+        return (
+          <div>
+            <div className="waiting-for-players-msg">
+              Waiting for players... (need 2 to start the game)
+            </div>
+            {gameScreen}
+          </div>
+        );
+      }
+      break;
+    case GameStateDesc.Starting:
+      {
+        return (
+          <div>
+            <div className="starting-msg">
+              Starting: <span>{gameState.start_timer}</span>
+            </div>
+            {gameScreen}
+          </div>
+        );
+      }
+      break;
+    case GameStateDesc.Ended:
+      {
+        const winnerId = gameState["last_player_to_answer"];
+        const winner = gameState["players"][winnerId];
+        return (
+          <div>
+            <div className="game-ended">Game Ended. Winner is {winner.nickname}</div>
+            {gameScreen}
+          </div>
+        );
+      }
+      break;
+    default:
+      {
+        console.warn(`Invalid game state description: ${gameState.desc}.`);
+        return <div></div>;
+      }
+      break;
+  }
+};
+
 const WordsGame = () => {
   const [nickname, setNickname] = useState<string>("");
-  const canJoin = nickname.length !== 0;
   const [step, setStep] = useState<WordsGameStep>(WordsGameStep.Initial);
   const [gameState, setGameState] = useState<WordsGameState | null>(emptyGameState());
   const [userGuess, setState] = useState<string>("");
@@ -102,6 +210,7 @@ const WordsGame = () => {
 
   const [messageHistory, setMessageHistory] = useState<Message[]>([]);
 
+  // Handle messages
   useEffect(() => {
     const onMessage = (event) => {
       const parsed = JSON.parse(event.data);
@@ -112,7 +221,6 @@ const WordsGame = () => {
       socket.current!.removeEventListener("message", onMessage);
     };
   }, [messageHistory]);
-
   useEffect(() => {
     if (messageHistory.length === 0) return;
     for (let i = 0; i < messageHistory.length; ++i) {
@@ -140,49 +248,26 @@ const WordsGame = () => {
     setMessageHistory([]);
   }, [messageHistory]);
 
+  // Change current local step depending on the game state
   useEffect(() => {
     if (gameState === null) {
       setStep(WordsGameStep.Initial);
-      return;
-    }
-    /* console.log(gameState); */
-    switch (gameState.desc) {
-      case GameStateDesc.WaitingForPlayers:
-        {
-          setStep(WordsGameStep.Playing);
-        }
-        break;
-      case GameStateDesc.Starting:
-        {
-          setStep(WordsGameStep.Playing);
-        }
-        break;
-      case GameStateDesc.Playing:
-        {
-          setStep(WordsGameStep.Playing);
-        }
-        break;
+    } else {
+      setStep(WordsGameStep.Playing);
     }
   }, [gameState]);
 
-  const game = (() => {
+  // Render
+  const game = useMemo(() => {
     switch (step) {
       case WordsGameStep.Initial:
         {
           return (
-            <div>
-              <Input
-                onChange={(e) => setNickname(e.target.value)}
-                placeholder="Nickname"
-                className="mr-2"
-                onKeyDown={(e) => {
-                  if (e.keyCode === 13 && canJoin) join();
-                }}
-              />
-              <Button disabled={!canJoin} onClick={join} variant="contained" color="primary">
-                Join
-              </Button>
-            </div>
+            <InitialScreen
+              nickname={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              join={join}
+            />
           );
         }
         break;
@@ -193,95 +278,15 @@ const WordsGame = () => {
         break;
       case WordsGameStep.Playing:
         {
-          if (gameState === null) return;
-          const gameScreen = (
-            <div>
-              <h1>Game</h1>
-              <div>
-                <div>Players:</div>
-                {Object.keys(gameState?.players || {}).map((pidS) => {
-                  const playerId = Number(pidS);
-                  const player = (gameState.players as any)[playerId];
-                  const dead = player.lives_left === 0;
-                  let hearts = [];
-                  for (let i = 0; i < player.lives_left; ++i) hearts.push(<FavoriteIcon key={i} />);
-                  const turn = gameState.whos_turn === playerId;
-                  return (
-                    <div
-                      key={playerId}
-                      className={cn({
-                        player: true,
-                        player_dead: dead,
-                      })}
-                    >
-                      {turn && <ArrowRightAltIcon />}
-                      {hearts}
-                      <span>{player.nickname}</span>
-                      {turn && <span>{gameState.user_input}</span>}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-          switch (gameState.desc) {
-            case GameStateDesc.Playing:
-              {
-                return <div>{gameScreen}</div>;
-              }
-              break;
-            case GameStateDesc.WaitingForPlayers:
-              {
-                return (
-                  <div>
-                    <div className="waiting-for-players-msg">
-                      Waiting for players... (need 2 to start the game)
-                    </div>
-                    {gameScreen}
-                  </div>
-                );
-              }
-              break;
-            case GameStateDesc.Starting:
-              {
-                return (
-                  <div>
-                    <div className="starting-msg">
-                      Starting: <span>{gameState.start_timer}</span>
-                    </div>
-                    {gameScreen}
-                  </div>
-                );
-              }
-              break;
-            case GameStateDesc.Ended:
-              {
-                const winnerId = gameState["last_player_to_answer"];
-                const winner = gameState["players"][winnerId];
-                return (
-                  <div>
-                    <div className="game-ended">
-                      Game Ended. Winner is {winner.nickname}
-                    </div>
-                    {gameScreen}
-                  </div>
-                );
-              }
-              break;
-            default:
-              {
-                console.warn(`Invalid game state description: ${gameState.desc}.`);
-                return <div></div>;
-              }
-              break;
-          }
+          return <GameScreen gameState={gameState} />;
         }
         break;
       default: {
         return <div>Invaild state</div>;
       }
     }
-  })();
+  }, [step, gameState, nickname]);
+
   return (
     <Screen title="Words">
       <div className="words-game">{game}</div>
