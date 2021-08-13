@@ -24,6 +24,8 @@ const WS_WORDS_API_URL = `ws://${location.hostname}:8080/words/`;
 
 enum CWMSG {
   Joining = 0,
+  UpdateInput = 1,
+  SubmitGuess = 2,
 }
 
 enum SWMSG {
@@ -35,6 +37,7 @@ type PlayerId = number;
 interface PlayerInfo {
   nickname: string;
   lives_left: number;
+  input: string;
 }
 
 enum GameStateDesc {
@@ -44,12 +47,11 @@ enum GameStateDesc {
   Ended = 3,
 }
 
-interface WordsGameState {
+interface GameState {
   players: Record<PlayerId, PlayerInfo>;
   whos_turn: PlayerId;
   start_timer: number;
   particle: string | null;
-  user_input: string;
   desc: GameStateDesc;
   last_player_to_answer: PlayerId | null;
 }
@@ -60,11 +62,15 @@ enum WordsGameStep {
   Playing = 2,
 }
 
-interface Message extends Record<string, any> {
+interface ClientMessage extends Record<string, any> {
   type: CWMSG;
 }
 
-const emptyGameState = (): WordsGameState | null => {
+interface ServerMessage extends Record<string, any> {
+  type: SWMSG;
+}
+
+const emptyGameState = (): GameState | null => {
   return null;
 };
 
@@ -93,12 +99,31 @@ const InitialScreen = (props: {
   );
 };
 
-const GameScreen = (props: { gameState: GameState }) => {
-  const { gameState } = props;
-  if (gameState === null) return;
+const GameScreen = (props: {
+  socket: WSocket<CWMSG>;
+  myId: PlayerId;
+  gameState: GameState | null;
+}) => {
+  const { socket, myId, gameState } = props;
+  const isThisMyTurn = gameState?.whos_turn === myId;
+  const [userInput, setUserInput] = useState<string>("");
+  const updateInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUserInput(e.target.value);
+  };
+  const submitGuess = () => {
+    socket.send(CWMSG.SubmitGuess, { guess: userInput });
+  };
+  console.log(myId, isThisMyTurn);
+  useEffect(() => {
+    if (isThisMyTurn) {
+      socket.send(CWMSG.UpdateInput, { input: userInput });
+    }
+  }, [userInput]);
+  if (gameState === null) return <div>Loading...</div>;
   const gameScreen = (
     <div>
       <h1>Game</h1>
+      <div>{gameState.particle}</div>
       <div>
         <div>Players:</div>
         {Object.keys(gameState?.players || {}).map((pidS) => {
@@ -108,6 +133,23 @@ const GameScreen = (props: { gameState: GameState }) => {
           let hearts = [];
           for (let i = 0; i < player.lives_left; ++i) hearts.push(<FavoriteIcon key={i} />);
           const turn = gameState.whos_turn === playerId;
+          const isThisMe = playerId === myId;
+          const input = (() => {
+            if (isThisMe && isThisMyTurn) {
+              return (
+                <Input
+                  value={userInput}
+                  onChange={updateInput}
+                  onKeyDown={(e) => {
+                    if (e.keyCode === 13) {
+                      submitGuess();
+                    }
+                  }}
+                />
+              );
+            }
+            return <div>{turn && <span>{player.input}</span>}</div>;
+          })();
           return (
             <div
               key={playerId}
@@ -119,7 +161,7 @@ const GameScreen = (props: { gameState: GameState }) => {
               {turn && <ArrowRightAltIcon />}
               {hearts}
               <span>{player.nickname}</span>
-              {turn && <span>{gameState.user_input}</span>}
+              {input}
             </div>
           );
         })}
@@ -158,7 +200,7 @@ const GameScreen = (props: { gameState: GameState }) => {
       break;
     case GameStateDesc.Ended:
       {
-        const winnerId = gameState["last_player_to_answer"];
+        const winnerId = gameState["last_player_to_answer"]!;
         const winner = gameState["players"][winnerId];
         return (
           <div>
@@ -177,42 +219,39 @@ const GameScreen = (props: { gameState: GameState }) => {
   }
 };
 
-const WordsGame = () => {
-  const [nickname, setNickname] = useState<string>("");
-  const [step, setStep] = useState<WordsGameStep>(WordsGameStep.Initial);
-  const [gameState, setGameState] = useState<WordsGameState | null>(emptyGameState());
-  const [userGuess, setState] = useState<string>("");
-  const resetState = () => setGameState(emptyGameState());
+enum WSocketState {
+  Initial = 0,
+  Closed = 1,
+  Opened = 2,
+}
 
-  // Socket interaction
+interface WSocket<CT> {
+  send: (type: CT, msgPayload: any) => void;
+  state: WSocketState;
+}
+
+function useWSocket<CT, C, S>(msgHistoryListener: (msgHistory: S[]) => void): WSocket<CT> {
   const socket = useRef<WebSocket | null>(null);
-  const onOpen = (event: any) => {};
+  const [state, setState] = useState(WSocketState.Initial);
+  const onOpen = (event: any) => {
+    setState(WSocketState.Opened);
+  };
   const onClose = (event: any) => {
-    resetState();
-    setStep(WordsGameStep.Initial);
-    initSocket();
+    setState(WSocketState.Closed);
   };
   const initSocket = () => {
     socket.current = new WebSocket(WS_WORDS_API_URL);
     socket.current.addEventListener("open", onOpen);
     socket.current.addEventListener("close", onClose);
   };
-  const socketSend = (m: Message) => socket.current!.send(JSON.stringify(m));
-
-  const join = () => {
-    setStep(WordsGameStep.Joining);
-    socketSend({ type: CWMSG.Joining, nickname });
-  };
-
   useEffect(() => {
     initSocket();
   }, []);
-
-  const [messageHistory, setMessageHistory] = useState<Message[]>([]);
-
+  const send = (type: CT, m: any) => socket.current!.send(JSON.stringify({ type, ...m }));
   // Handle messages
+  const [messageHistory, setMessageHistory] = useState<S[]>([]);
   useEffect(() => {
-    const onMessage = (event) => {
+    const onMessage = (event: any) => {
       const parsed = JSON.parse(event.data);
       setMessageHistory([...messageHistory, parsed]);
     };
@@ -223,30 +262,66 @@ const WordsGame = () => {
   }, [messageHistory]);
   useEffect(() => {
     if (messageHistory.length === 0) return;
-    for (let i = 0; i < messageHistory.length; ++i) {
-      const parsed = messageHistory[i];
-      console.log(parsed);
-      switch (parsed.type) {
-        case SWMSG.InitGame:
-          {
-            setGameState(parsed.state);
-          }
-          break;
-        case SWMSG.UpdateGameState:
-          {
-            setGameState({ ...gameState, ...parsed.state });
-          }
-          break;
-        default:
-          {
-            console.warn("Unhandled message");
-            console.warn(parsed);
-          }
-          break;
-      }
-    }
+    msgHistoryListener(messageHistory);
     setMessageHistory([]);
   }, [messageHistory]);
+  return {
+    send,
+    state,
+  };
+}
+
+const WordsGame = () => {
+  const [nickname, setNickname] = useState<string>("");
+  const [step, setStep] = useState<WordsGameStep>(WordsGameStep.Initial);
+  const [gameState, setGameState] = useState<GameState | null>(emptyGameState());
+  const [userGuess, setState] = useState<string>("");
+  const [myId, setMyId] = useState<PlayerId>(-1);
+  const resetState = () => setGameState(emptyGameState());
+  const socket = useWSocket<CWMSG, ClientMessage, ServerMessage>(
+    (messageHistory: ServerMessage[]) => {
+      for (let i = 0; i < messageHistory.length; ++i) {
+        const parsed = messageHistory[i];
+        console.log(parsed);
+        switch (parsed.type) {
+          case SWMSG.InitGame:
+            {
+              setStep(WordsGameStep.Initial);
+              setGameState(parsed.state);
+              setMyId(parsed.player.id);
+            }
+            break;
+          case SWMSG.UpdateGameState:
+            {
+              setGameState({ ...gameState, ...parsed.state });
+            }
+            break;
+          default:
+            {
+              console.warn("Unhandled message");
+              console.warn(parsed);
+            }
+            break;
+        }
+      }
+    },
+  );
+
+  useEffect(() => {
+    console.log(`Socket state: ${socket.state}`);
+    switch (socket.state) {
+      case WSocketState.Closed:
+        {
+          resetState();
+        }
+        break;
+    }
+  }, [socket.state]);
+
+  const join = () => {
+    setStep(WordsGameStep.Joining);
+    socket.send(CWMSG.Joining, { nickname });
+  };
 
   // Change current local step depending on the game state
   useEffect(() => {
@@ -278,7 +353,7 @@ const WordsGame = () => {
         break;
       case WordsGameStep.Playing:
         {
-          return <GameScreen gameState={gameState} />;
+          return <GameScreen myId={myId} socket={socket} gameState={gameState} />;
         }
         break;
       default: {

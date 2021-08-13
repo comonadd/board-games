@@ -8,6 +8,7 @@ from aiohttp import web
 from aiohttp.http_websocket import WSCloseCode, WSMessage
 from dataclasses import dataclass, field, asdict
 from typing import Dict, Set, List
+import sys
 
 # Environment
 from aiohttp.web_ws import WebSocketResponse
@@ -37,10 +38,11 @@ def configure_loggers():
 # Settings
 TIME_UNTIL_START = 4
 LIVES_INITIAL = 3
-MIN_PLAYERS_TO_START_GAME = 2
-TIME_TO_ANSWER = 1
+MIN_PLAYERS_TO_START_GAME = 1
+TIME_TO_ANSWER = 5
 WORDS_DICT_PATH = "./russian-words/words.txt"
 PARTICLES_PATH = "./russian-words/particles.json"
+MIN_PARTICLE_LENGTH = 3
 
 
 class Difficulty(Enum):
@@ -77,6 +79,8 @@ def load_dictionary(words_dict_path: str, particles_path: str) -> WordGameDict:
 class CWMSG:
     """ Client messages. """
     Joining = 0
+    UpdateInput = 1
+    SubmitGuess = 2
 
 
 class SWMSG:
@@ -98,6 +102,7 @@ PlayerId = int
 @dataclass
 class PlayerInfo:
     """ Information on the current player state. """
+    id: int = -1
     lives_left: int = LIVES_INITIAL
     nickname: str = None
 
@@ -110,7 +115,6 @@ class GameState:
     particle: str = None
     desc: GameStateDesc = GameStateDesc.WaitingForPlayers
     start_timer: int = -1
-    user_input: str = ""  # Current user input preview
     guess: str = ""  # User guess (after pressing enter)
     last_player_to_answer: PlayerId = None
 
@@ -151,9 +155,10 @@ async def ws_send_to_others(W: ServerState, si: ClientInfo, msg: Message):
 
 def state_update_msg(W: ServerState, *keys):
     gs = W.game_state
+    gsd = asdict(gs)
     msg = {
         "type": SWMSG.UpdateGameState,
-        "state": {key: gs.__dict__[key] for key in keys}
+        "state": {key: gsd[key] for key in keys}
     }
     return msg
 
@@ -180,14 +185,15 @@ async def wrong_guess(W: ServerState, player: PlayerInfo):
 async def correct_guess(W: ServerState, player: PlayerInfo):
     gs = W.game_state
     gs.guess = ""
-    gs.user_input = ""
-    await notify_of_su(W, "guess", "user_input")
+    for _, player in gs.players.items():
+        player.input = ""
+    await notify_of_su(W, "guess", "players")
 
 
 def cycle_alive_players(players):
     while True:
         player_dead_counted = 0
-        for p in players:
+        for p in players.keys():
             player = players[p]
             if player.lives_left == 0:
                 player_dead_counted += 1
@@ -207,14 +213,11 @@ async def end_game(W: ServerState):
 
 
 def particles_dict_for(W: ServerState, diff: Difficulty):
-    logger.debug("hello i am here")
-    logger.debug(W.ww.by_difficulty)
     return W.ww.by_difficulty[diff]
 
 
 def is_guess_correct(W: ServerState, guess: str) -> bool:
-    logger.debug(W.ww.words)
-    return guess in W.ww.words
+    return len(guess) >= MIN_PARTICLE_LENGTH and guess in W.ww.words
 
 
 async def start_game(W: ServerState):
@@ -237,17 +240,19 @@ async def start_game(W: ServerState):
             gs.last_player_to_answer = player_id
             logger.debug("Processing player {}".format(player.nickname))
             particle = random.choice(pdict)
-            logger.debug("Guessing {}".format(correct_guess))
+            # logger.debug("Guessing {}".format(correct_guess))
             time_left = TIME_TO_ANSWER
             gs.whos_turn = player_id
             gs.particle = particle
-            gs.user_input = ""
-            await notify_of_su(W, "whos_turn", "particle", "user_input", "last_player_to_answer")
+            player.input = ""
+            await notify_of_su(W, "whos_turn", "particle", "players", "last_player_to_answer")
             while True:
                 is_correct = is_guess_correct(W, gs.guess)
+                logger.debug(f"Guess: {gs.guess}, correct: {is_correct}")
                 if is_correct:
                     logger.debug("Correct guess!!")
                     await correct_guess(W, player)
+                    await asyncio.sleep(1)
                     break
                 if time_left <= 0:
                     logger.debug("Failed")
@@ -264,10 +269,11 @@ async def reset_game(W: ServerState):
     gs = W.game_state
     gs.desc = GameStateDesc.WaitingForPlayers
     gs.start_timer = -1
-    gs.user_input = ""
+    for _, player in gs.players.items():
+        player.input = ""
     gs.particle = None
     gs.whos_turn = -1
-    await notify_of_su(W, "desc", "start_timer", "user_input", "particle", "whos_turn")
+    await notify_of_su(W, "desc", "start_timer", "players", "particle", "whos_turn")
 
 
 async def send_to_user(si: ClientInfo, msg: Message):
@@ -279,23 +285,43 @@ def waiting_for_players(gs: GameState):
 
 
 async def on_player_joined(W: ServerState, gs: GameState, si: ClientInfo, parsed: Message):
+    # TODO: Don't allow new players to join if the game is already in progress
     nickname = parsed["nickname"]
     logger.debug("{} is joining".format(nickname))
     # We ahve enough players to start the game
     ws_id = si.id
-    gs.players[ws_id] = PlayerInfo(
+    new_player = PlayerInfo(
         nickname=nickname,
         lives_left=LIVES_INITIAL,
         id=ws_id,
     )
-    await send_to_user(si, {"type": SWMSG.InitGame, "state": asdict(gs)})
+    gs.players[ws_id] = new_player
+    await send_to_user(
+        si, {"type": SWMSG.InitGame, "state": asdict(gs), "player": asdict(new_player) })
     await notify_others_of_su(W, si, "players")
     if waiting_for_players(gs) and len(gs.players) >= MIN_PLAYERS_TO_START_GAME:
         await start_game(W)
 
+async def on_player_input(W: ServerState, gs: GameState, si: ClientInfo, parsed: Message):
+    # Can't update input if not your turn
+    if si.id != gs.whos_turn:
+        logger.warning(f"Player #{si.id} tried to update input during #{gs.whos_turn} player's turn")
+        return
+    gs.players[si.id].input = parsed.input
+    await notify_others_of_su(W, si, "players")
+
+async def on_player_submit(W: ServerState, gs: GameState, si: ClientInfo, parsed: Message):
+    # Can't submit guess if not your turn
+    if si.id != gs.whos_turn:
+        logger.warning(f"Player #{si.id} tried to submit guess during #{gs.whos_turn} player's turn")
+        return
+    logger.debug(f"Submit guess: {parsed.guess}")
+    gs.guess = parsed.guess
 
 ws_handlers_mapping = {
     CWMSG.Joining: on_player_joined,
+    CWMSG.UpdateInput: on_player_input,
+    CWMSG.SubmitGuess: on_player_submit,
 }
 
 # Player id
@@ -357,7 +383,8 @@ async def words_game(request):
                 continue
             if msg.type == aiohttp.WSMsgType.TEXT:
                 parsed = json.loads(msg.data)
-                print(parsed)
+                logger.debug("GOT MESSAGE FROM CLIENT")
+                logger.debug(parsed)
                 _type = parsed["type"]
                 f = ws_handlers_mapping.get(_type, None)
                 if f is None:
@@ -373,15 +400,16 @@ async def words_game(request):
     return ws
 
 
-def init_server():
+def create_app():
+    configure_loggers()
     words_server_state.ww = load_dictionary(WORDS_DICT_PATH, PARTICLES_PATH)
+    logger.info("Running in {} mode".format("DEV" if DEV else "PROD"))
+    app = web.Application()
+    app.add_routes(routes)
+    logger.debug("new msg")
+    return app
 
-
-app = web.Application()
-app.add_routes(routes)
 
 if __name__ == '__main__':
-    configure_loggers()
-    logger.info("Running in {} mode".format("DEV" if DEV else "PROD"))
-    init_server()
+    app = create_app()
     web.run_app(app, host="127.0.0.1")
