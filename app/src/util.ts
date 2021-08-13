@@ -53,6 +53,12 @@ export function shuffleArray<T>(arr: T[]): T[] {
   return result;
 }
 
+export function randomChoice<T>(arr: T[]): T {
+  const idx = Math.floor(Math.random() * arr.length);
+  return arr[idx];
+}
+
+export const capitalize = (s: string): string => s[0].toUpperCase() + s.substring(1);
 
 export type Milliseconds = number;
 export type Seconds = number;

@@ -17,7 +17,7 @@ import { version } from "../package.json";
 import { Link, BrowserRouter as Router, Route, Switch } from "react-router-dom";
 import FavoriteIcon from "@material-ui/icons/Favorite";
 import ArrowRightAltIcon from "@material-ui/icons/ArrowRightAlt";
-import { cn } from "./util";
+import { cn, capitalize, randomChoice } from "./util";
 import { Screen, ScreenContent } from "./Screen";
 
 const WS_WORDS_API_URL = `ws://${location.hostname}:8080/words/`;
@@ -271,8 +271,16 @@ function useWSocket<CT, C, S>(msgHistoryListener: (msgHistory: S[]) => void): WS
   };
 }
 
+const NICKNAME_PARTICLES_FIRST = ["john", "adam", "nicholas", "donald", "mary"];
+const NICKNAME_PARTICLES_SECOND = ["red", "green", "smith", "duck", "yellow"];
+const generateInitialNickname = () => {
+  const first = capitalize(randomChoice(NICKNAME_PARTICLES_FIRST));
+  const second = capitalize(randomChoice(NICKNAME_PARTICLES_SECOND));
+  return `${first} ${second}`;
+};
+
 const WordsGame = () => {
-  const [nickname, setNickname] = useState<string>("");
+  const [nickname, setNickname] = useState<string>(generateInitialNickname());
   const [step, setStep] = useState<WordsGameStep>(WordsGameStep.Initial);
   const [gameState, setGameState] = useState<GameState | null>(emptyGameState());
   const [userGuess, setState] = useState<string>("");
