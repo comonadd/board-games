@@ -21,6 +21,7 @@ import IndexPage from "./IndexPage";
 import NotFoundPage from "./NotFoundPage";
 import QuizGame from "./QuizGame";
 import WordsGame from "./WordsGame";
+import paths from "./paths";
 
 const Header = () => {
   return (
@@ -44,9 +45,9 @@ const App = () => {
       <div className="app">
         <Header />
         <Switch>
-          <Route path="/" exact component={IndexPage} />
-          <Route path="/quiz" exact component={QuizGame} />
-          <Route path="/words" exact component={WordsGame} />
+          <Route path={paths.INDEX} exact component={IndexPage} />
+          <Route path={paths.QUIZ_GAME} exact component={QuizGame} />
+          <Route path={paths.WORDS_GAME} exact component={WordsGame} />
           <Route path="*" component={NotFoundPage} />
         </Switch>
       </div>
