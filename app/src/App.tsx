@@ -22,6 +22,7 @@ import NotFoundPage from "./NotFoundPage";
 import QuizGame from "./QuizGame";
 import WordsGame from "./WordsGame";
 import paths from "./paths";
+import { Localizator } from "./ln";
 
 const Header = () => {
   return (
@@ -41,17 +42,19 @@ const Header = () => {
 
 const App = () => {
   return (
-    <Router>
-      <div className="app">
-        <Header />
-        <Switch>
-          <Route path={paths.INDEX} exact component={IndexPage} />
-          <Route path={paths.QUIZ_GAME} exact component={QuizGame} />
-          <Route path={paths.WORDS_GAME} exact component={WordsGame} />
-          <Route path="*" component={NotFoundPage} />
-        </Switch>
-      </div>
-    </Router>
+    <Localizator>
+      <Router>
+        <div className="app">
+          <Header />
+          <Switch>
+            <Route path={paths.INDEX} exact component={IndexPage} />
+            <Route path={paths.QUIZ_GAME} exact component={QuizGame} />
+            <Route path={paths.WORDS_GAME} exact component={WordsGame} />
+            <Route path="*" component={NotFoundPage} />
+          </Switch>
+        </div>
+      </Router>
+    </Localizator>
   );
 };
 

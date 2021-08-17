@@ -1,0 +1,15 @@
+{
+  "s": {
+    "waiting-players": "Waiting for players",
+    "ent-nick": "Enter a nickname",
+    "joining": "Joining...",
+    "join": "Join",
+    "in-game": "Game in progress",
+    "game-ended-me": "Game ended. You won!"
+  },
+  "fmt": {
+    "waiting-players": "Waiting for players ({}/{})",
+    "starting": "Starting... {}",
+    "game-ended": "Game ended. Winner is {}"
+  }
+}

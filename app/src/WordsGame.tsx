@@ -17,6 +17,7 @@ import {
 } from "./util";
 import { Screen, ScreenContent, ScreenContentHeader } from "./Screen";
 import { MIN_PLAYERS_FOR_GAME, WS_WORDS_API_URL } from "./constants";
+import { t, tfmt } from "./ln";
 
 enum CWMSG {
   Joining = 0,
@@ -80,7 +81,7 @@ const InitialScreen = (props: {
   const { nickname, onChange, join } = props;
   const canJoin = nickname.length !== 0;
   return (
-    <Screen title="Enter a nickname">
+    <Screen title={t("ent-nick")}>
       <ScreenContent className="flex flex-c">
         <div>
           <Input
@@ -93,7 +94,7 @@ const InitialScreen = (props: {
             }}
           />
           <Button disabled={!canJoin} onClick={join} variant="contained" color="primary">
-            Join
+            {t("join")}
           </Button>
         </div>
       </ScreenContent>
@@ -146,13 +147,12 @@ const GameEndedScreen = ({ myId, join, gameState, winner }: GameEndedScreenProps
       <ScreenContent className="flex flex-col game-ended-message flex flex-c">
         <div className="mb-4">
           <Typography component="h1" variant="h5">
-            Game Ended. Winner is <b>{winnerPlayer.nickname}</b>
-            {winner! === myId && " (You)"}
+            {winner! === myId ? t("game-ended-me") : tfmt("game-ended", winnerPlayer.nickname)}
           </Typography>
         </div>
         <Button onClick={join} color="primary" variant="contained" size="large" className="ph-16">
           <Typography component="p" variant="body1" className="fs-16">
-            Join
+            {t("join")}
           </Typography>
         </Button>
       </ScreenContent>
@@ -216,10 +216,11 @@ const GameTable = ({ gameState, socket, myId }: GameTableProps) => {
 };
 
 const StartingScreen = (props: GameTableProps) => {
+  const ts = tfmt("starting", props.gameState.start_timer);
   return (
-    <Screen title={`Starting... ${props.gameState.start_timer}`}>
+    <Screen title={ts}>
       <ScreenContent>
-        <ScreenContentHeader title={`Starting: ${props.gameState.start_timer}`} />
+        <ScreenContentHeader title={ts} />
         <GameTable {...props} />
       </ScreenContent>
     </Screen>
@@ -229,10 +230,10 @@ const StartingScreen = (props: GameTableProps) => {
 const WaitingForPlayersScreen = (props: GameTableProps) => {
   const gs = props.gameState;
   return (
-    <Screen title="Waiting for players">
+    <Screen title={t("waiting-players")}>
       <ScreenContent>
         <ScreenContentHeader
-          title={`Waiting for players (${Object.keys(gs.players).length}/${MIN_PLAYERS_FOR_GAME})`}
+          title={tfmt("waiting-players", Object.keys(gs.players).length, MIN_PLAYERS_FOR_GAME)}
         />
         <GameTable {...props} />
       </ScreenContent>
@@ -242,8 +243,8 @@ const WaitingForPlayersScreen = (props: GameTableProps) => {
 
 const JoiningScreen = () => {
   return (
-    <Screen title="Enter a nickname">
-      <ScreenContent className="flex flex-c">Joining...</ScreenContent>
+    <Screen title={t("ent-nick")}>
+      <ScreenContent className="flex flex-c">{t("joining")}</ScreenContent>
     </Screen>
   );
 };
@@ -282,7 +283,7 @@ const PlayingScreen = (props: GameTableProps & { socket: WSocket<CWMSG>; myId: P
   return (
     <Screen title="Playing">
       <ScreenContent>
-        <ScreenContentHeader title="Currently in game" />
+        <ScreenContentHeader title={t("in-game")} />
         <GameTable {...props} gameState={gameState!} />
         {myTurn && (
           <Input
