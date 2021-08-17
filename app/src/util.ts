@@ -168,3 +168,54 @@ export function useWSocket<CT, C, S>(
     state,
   };
 }
+
+const NICKNAME_PARTICLES_FIRST = [
+  "red",
+  "green",
+  "yellow",
+  "fancy",
+  "curious",
+  "surprised",
+  "black",
+  "big",
+  "different",
+  "free",
+  "important",
+  "large",
+  "little",
+  "local",
+  "major",
+  "old",
+  "social",
+  "strong",
+  "white",
+];
+const NICKNAME_PARTICLES_SECOND = [
+  "squirrel",
+  "cat",
+  "elephant",
+  "rhino",
+  "monkey",
+  "dog",
+  "turtle",
+  "rabbit",
+  "parrot",
+  "kitten",
+  "hamster",
+  "mouse",
+  "snake",
+  "sheep",
+  "deer",
+  "horse",
+  "chicken",
+  "bee",
+  "turkey",
+  "cow",
+  "duck",
+];
+export const generateInitialNickname = () => {
+  const first = capitalize(randomChoice(NICKNAME_PARTICLES_FIRST));
+  const second = capitalize(randomChoice(NICKNAME_PARTICLES_SECOND));
+  const num = Math.round(Math.random() * 1000);
+  return `${first} ${second} #${num}`;
+};

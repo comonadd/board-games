@@ -6,9 +6,17 @@ import Button from "@material-ui/core/Button";
 import Typography from "@material-ui/core/Typography";
 import FavoriteIcon from "@material-ui/icons/Favorite";
 import ArrowRightAltIcon from "@material-ui/icons/ArrowRightAlt";
-import { cn, capitalize, randomChoice, WSocketState, WSocket, useWSocket } from "./util";
+import {
+  generateInitialNickname,
+  cn,
+  capitalize,
+  randomChoice,
+  WSocketState,
+  WSocket,
+  useWSocket,
+} from "./util";
 import { Screen, ScreenContent, ScreenContentHeader } from "./Screen";
-import { WS_WORDS_API_URL } from "./constants";
+import { MIN_PLAYERS_FOR_GAME, WS_WORDS_API_URL } from "./constants";
 
 enum CWMSG {
   Joining = 0,
@@ -219,10 +227,13 @@ const StartingScreen = (props: GameTableProps) => {
 };
 
 const WaitingForPlayersScreen = (props: GameTableProps) => {
+  const gs = props.gameState;
   return (
-    <Screen title={`Starting... ${props.gameState.start_timer}`}>
+    <Screen title="Waiting for players">
       <ScreenContent>
-        <ScreenContentHeader title="Waiting for players" />
+        <ScreenContentHeader
+          title={`Waiting for players (${Object.keys(gs.players).length}/${MIN_PLAYERS_FOR_GAME})`}
+        />
         <GameTable {...props} />
       </ScreenContent>
     </Screen>
@@ -311,57 +322,6 @@ const GameScreen = (props: {
       )}
     </>
   );
-};
-
-const NICKNAME_PARTICLES_FIRST = [
-  "red",
-  "green",
-  "yellow",
-  "fancy",
-  "curious",
-  "surprised",
-  "black",
-  "big",
-  "different",
-  "free",
-  "important",
-  "large",
-  "little",
-  "local",
-  "major",
-  "old",
-  "social",
-  "strong",
-  "white",
-];
-const NICKNAME_PARTICLES_SECOND = [
-  "squirrel",
-  "cat",
-  "elephant",
-  "rhino",
-  "monkey",
-  "dog",
-  "turtle",
-  "rabbit",
-  "parrot",
-  "kitten",
-  "hamster",
-  "mouse",
-  "snake",
-  "sheep",
-  "deer",
-  "horse",
-  "chicken",
-  "bee",
-  "turkey",
-  "cow",
-  "duck",
-];
-const generateInitialNickname = () => {
-  const first = capitalize(randomChoice(NICKNAME_PARTICLES_FIRST));
-  const second = capitalize(randomChoice(NICKNAME_PARTICLES_SECOND));
-  const num = Math.round(Math.random() * 1000);
-  return `${first} ${second} #${num}`;
 };
 
 const WordsGame = () => {
