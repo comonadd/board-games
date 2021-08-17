@@ -305,7 +305,7 @@ async def on_player_joined(W: ServerState, gs: GameState, si: ClientInfo, parsed
         si, {"type": SWMSG.InitGame, "state": asdict(gs), "player": asdict(new_player) })
     await notify_others_of_su(W, si, "players")
     if waiting_for_players(gs) and len(gs.players) >= MIN_PLAYERS_TO_START_GAME:
-        asyncio.ensure_future(start_game(W))
+        asyncio.create_task(start_game(W))
 
 async def on_player_input(W: ServerState, gs: GameState, si: ClientInfo, parsed: Message):
     # Can't update input if not your turn
