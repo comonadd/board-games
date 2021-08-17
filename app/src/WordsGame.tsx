@@ -338,7 +338,6 @@ const WordsGame = () => {
     (messageHistory: ServerMessage[]) => {
       for (let i = 0; i < messageHistory.length; ++i) {
         const parsed = messageHistory[i];
-        console.log(parsed);
         switch (parsed.type) {
           // We get this after joining with a nickname
           case SWMSG.InitGame:
@@ -372,7 +371,6 @@ const WordsGame = () => {
   );
 
   useEffect(() => {
-    console.log(`Socket state: ${socket.state}`);
     switch (socket.state) {
       case WSocketState.Closed:
         {

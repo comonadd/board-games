@@ -31,7 +31,6 @@ export const tfmt = (k: string, ...args: any[]) => {
   let argIdx = 0;
   let startIdx = 0;
   while (i < f.length) {
-    console.log(i);
     const ch = f[i];
     if (ch === "\\") {
       // skip current and next characters (this way we avoid interpreting \{ as a formatting slot
@@ -45,7 +44,6 @@ export const tfmt = (k: string, ...args: any[]) => {
       }
       // copy the accumulated string before
       const endIdx = i;
-      console.log(`${startIdx}/${endIdx}: ${f.substr(startIdx, endIdx)}`);
       if (startIdx !== endIdx) {
         res += f.substring(startIdx, endIdx);
       }
