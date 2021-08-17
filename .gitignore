@@ -9,3 +9,4 @@ src/themes.json
 public
 __pycache__
 russian-words/
+.log/

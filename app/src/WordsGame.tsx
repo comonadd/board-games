@@ -1,26 +1,14 @@
-import logo from "./logo.svg";
-import React, { useMemo, useCallback, useRef, useState, useEffect } from "react";
-import ReactDOM from "react-dom";
+import React, { useMemo, useRef, useState, useEffect } from "react";
 import Input from "@material-ui/core/Input";
 import "./App.css";
-import Card from "@material-ui/core/Card";
 import Paper from "@material-ui/core/Paper";
-import CardActions from "@material-ui/core/CardActions";
-import CardContent from "@material-ui/core/CardContent";
 import Button from "@material-ui/core/Button";
-import IconButton from "@material-ui/core/IconButton";
-import ReplayIcon from "@material-ui/icons/Replay";
-import SettingsIcon from "@material-ui/icons/Settings";
 import Typography from "@material-ui/core/Typography";
-import Grid from "@material-ui/core/Grid";
-import { version } from "../package.json";
-import { Link, BrowserRouter as Router, Route, Switch } from "react-router-dom";
 import FavoriteIcon from "@material-ui/icons/Favorite";
 import ArrowRightAltIcon from "@material-ui/icons/ArrowRightAlt";
-import { cn, capitalize, randomChoice } from "./util";
-import { Screen, ScreenContent } from "./Screen";
-
-const WS_WORDS_API_URL = `ws://${location.hostname}:8080/words/`;
+import { cn, capitalize, randomChoice, WSocketState, WSocket, useWSocket } from "./util";
+import { Screen, ScreenContent, ScreenContentHeader } from "./Screen";
+import { WS_WORDS_API_URL } from "./constants";
 
 enum CWMSG {
   Joining = 0,
@@ -31,6 +19,7 @@ enum CWMSG {
 enum SWMSG {
   InitGame = 0,
   UpdateGameState = 1,
+  EndGame = 2,
 }
 
 type PlayerId = number;
@@ -38,13 +27,13 @@ interface PlayerInfo {
   nickname: string;
   lives_left: number;
   input: string;
+  id: PlayerId;
 }
 
 enum GameStateDesc {
   WaitingForPlayers = 0,
   Playing = 1,
   Starting = 2,
-  Ended = 3,
 }
 
 interface GameState {
@@ -60,6 +49,7 @@ enum WordsGameStep {
   Initial = 0,
   Joining = 1,
   Playing = 2,
+  Ended = 3,
 }
 
 interface ClientMessage extends Record<string, any> {
@@ -82,20 +72,221 @@ const InitialScreen = (props: {
   const { nickname, onChange, join } = props;
   const canJoin = nickname.length !== 0;
   return (
-    <div>
-      <Input
-        onChange={onChange}
-        value={nickname}
-        placeholder="Nickname"
-        className="mr-2"
-        onKeyDown={(e) => {
-          if (e.keyCode === 13 && canJoin) join();
-        }}
-      />
-      <Button disabled={!canJoin} onClick={join} variant="contained" color="primary">
-        Join
-      </Button>
+    <Screen title="Enter a nickname">
+      <ScreenContent className="flex flex-c">
+        <div>
+          <Input
+            onChange={onChange}
+            value={nickname}
+            placeholder="Nickname"
+            className="mr-2"
+            onKeyDown={(e) => {
+              if (e.keyCode === 13 && canJoin) join();
+            }}
+          />
+          <Button disabled={!canJoin} onClick={join} variant="contained" color="primary">
+            Join
+          </Button>
+        </div>
+      </ScreenContent>
+    </Screen>
+  );
+};
+
+const PlayerHearts = React.memo(({ n }: { n: number }) => {
+  let hearts = [];
+  for (let i = 0; i < n; ++i) {
+    hearts.push(<FavoriteIcon key={i} />);
+  }
+  return <div className="player-hearts">{hearts}</div>;
+});
+
+interface OtherTablePlayerProps {
+  player: PlayerInfo;
+  gameState: GameState;
+  playerTurn: boolean;
+}
+const TablePlayer = (props: OtherTablePlayerProps) => {
+  const { player, playerTurn, gameState } = props;
+  const dead = player.lives_left === 0;
+  return (
+    <div
+      className={cn({
+        player: true,
+        player_dead: dead,
+      })}
+    >
+      {playerTurn && <ArrowRightAltIcon />}
+      <div className="player-nickname">{player.nickname}</div>
+      <PlayerHearts n={player.lives_left} />
+      {playerTurn && <span>{player.input}</span>}
     </div>
+  );
+};
+
+interface GameEndedScreenProps {
+  myId: PlayerId;
+  winner: PlayerId | null;
+  join: () => void;
+  gameState: GameState;
+}
+
+const GameEndedScreen = ({ myId, join, gameState, winner }: GameEndedScreenProps) => {
+  const winnerPlayer = gameState["players"][winner!];
+  return (
+    <Screen title="Game Ended">
+      <ScreenContent className="flex flex-col game-ended-message flex flex-c">
+        <div className="mb-4">
+          <Typography component="h1" variant="h5">
+            Game Ended. Winner is <b>{winnerPlayer.nickname}</b>
+            {winner! === myId && " (You)"}
+          </Typography>
+        </div>
+        <Button onClick={join} color="primary" variant="contained" size="large" className="ph-16">
+          <Typography component="p" variant="body1" className="fs-16">
+            Join
+          </Typography>
+        </Button>
+      </ScreenContent>
+    </Screen>
+  );
+};
+
+interface GameTableProps {
+  gameState: GameState;
+  myId: PlayerId;
+  socket: WSocket<CWMSG>;
+}
+
+const GameTable = ({ gameState, socket, myId }: GameTableProps) => {
+  const angle = 360 / Object.keys(gameState?.players).length;
+  const circleSize = 300;
+
+  const renderedPlayers = useMemo(() => {
+    const players = Object.values(gameState?.players);
+    if (players.length === 0) return <div>No players joined yet</div>;
+    if (players.length === 1) {
+      const pid = players[0].id;
+      return (
+        <Paper elevation={1} key={pid} className="player-slot">
+          <TablePlayer
+            gameState={gameState}
+            player={players[0]}
+            playerTurn={gameState.whos_turn === pid}
+          />
+        </Paper>
+      );
+    }
+    return players.map((player, idx) => {
+      const pid = player.id;
+      const p = {
+        gameState,
+        player,
+        playerTurn: gameState.whos_turn === pid,
+      };
+      // Calculate table position
+      const rot = idx * angle;
+      const style = {
+        transform: `rotate(${rot}deg) translate(${circleSize / 2}px) rotate(${-rot}deg)`,
+      };
+      return (
+        <Paper elevation={1} key={pid} className="player-slot" style={style}>
+          <TablePlayer {...p} />
+        </Paper>
+      );
+    });
+  }, [gameState]);
+
+  return (
+    <div className="player-table">
+      <div className="player-table-center">
+        {gameState.particle && <div className="particle-to-guess">{gameState.particle}</div>}
+        {renderedPlayers}
+      </div>
+    </div>
+  );
+};
+
+const StartingScreen = (props: GameTableProps) => {
+  return (
+    <Screen title={`Starting... ${props.gameState.start_timer}`}>
+      <ScreenContent>
+        <ScreenContentHeader title={`Starting: ${props.gameState.start_timer}`} />
+        <GameTable {...props} />
+      </ScreenContent>
+    </Screen>
+  );
+};
+
+const WaitingForPlayersScreen = (props: GameTableProps) => {
+  return (
+    <Screen title={`Starting... ${props.gameState.start_timer}`}>
+      <ScreenContent>
+        <ScreenContentHeader title="Waiting for players" />
+        <GameTable {...props} />
+      </ScreenContent>
+    </Screen>
+  );
+};
+
+const JoiningScreen = () => {
+  return (
+    <Screen title="Enter a nickname">
+      <ScreenContent className="flex flex-c">Joining...</ScreenContent>
+    </Screen>
+  );
+};
+
+const PlayingScreen = (props: GameTableProps & { socket: WSocket<CWMSG>; myId: PlayerId }) => {
+  const { gameState, socket, myId } = props;
+  // Input
+  const myTurn = gameState?.whos_turn === myId;
+  const [userInput, setUserInput] = useState<string>("");
+  const updateInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUserInput(e.target.value);
+  };
+  const submitGuess = () => {
+    socket.send(CWMSG.SubmitGuess, { guess: userInput });
+    setUserInput("");
+  };
+  useEffect(() => {
+    if (myTurn) {
+      socket.send(CWMSG.UpdateInput, { input: userInput });
+    }
+  }, [userInput]);
+
+  // Auto-focus on current player's turn
+  const myInputRef = useRef<any>(null);
+  useEffect(() => {
+    if (!myTurn) return;
+    // Reset user input before each turn, then focus on it
+    setUserInput("");
+    if (myInputRef.current === null) {
+      console.warn("Input reference is null, can't focus");
+      return;
+    }
+    myInputRef.current.focus();
+  }, [myTurn]);
+
+  return (
+    <Screen title="Playing">
+      <ScreenContent>
+        <ScreenContentHeader title="Currently in game" />
+        <GameTable {...props} gameState={gameState!} />
+        {myTurn && (
+          <Input
+            value={userInput}
+            inputRef={myInputRef}
+            onChange={updateInput}
+            onKeyDown={(e) => {
+              if (e.keyCode === 13) {
+                submitGuess();
+              }
+            }}
+          />
+        )}
+      </ScreenContent>
+    </Screen>
   );
 };
 
@@ -103,180 +294,74 @@ const GameScreen = (props: {
   socket: WSocket<CWMSG>;
   myId: PlayerId;
   gameState: GameState | null;
+  join: () => void;
 }) => {
-  const { socket, myId, gameState } = props;
-  const isThisMyTurn = gameState?.whos_turn === myId;
-  const [userInput, setUserInput] = useState<string>("");
-  const updateInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setUserInput(e.target.value);
-  };
-  const submitGuess = () => {
-    socket.send(CWMSG.SubmitGuess, { guess: userInput });
-  };
-  console.log(myId, isThisMyTurn);
-  useEffect(() => {
-    if (isThisMyTurn) {
-      socket.send(CWMSG.UpdateInput, { input: userInput });
-    }
-  }, [userInput]);
+  const { join, socket, myId, gameState } = props;
   if (gameState === null) return <div>Loading...</div>;
-  const gameScreen = (
-    <div>
-      <h1>Game</h1>
-      <div>{gameState.particle}</div>
-      <div>
-        <div>Players:</div>
-        {Object.keys(gameState?.players || {}).map((pidS) => {
-          const playerId = Number(pidS);
-          const player = (gameState.players as any)[playerId];
-          const dead = player.lives_left === 0;
-          let hearts = [];
-          for (let i = 0; i < player.lives_left; ++i) hearts.push(<FavoriteIcon key={i} />);
-          const turn = gameState.whos_turn === playerId;
-          const isThisMe = playerId === myId;
-          const input = (() => {
-            if (isThisMe && isThisMyTurn) {
-              return (
-                <Input
-                  value={userInput}
-                  onChange={updateInput}
-                  onKeyDown={(e) => {
-                    if (e.keyCode === 13) {
-                      submitGuess();
-                    }
-                  }}
-                />
-              );
-            }
-            return <div>{turn && <span>{player.input}</span>}</div>;
-          })();
-          return (
-            <div
-              key={playerId}
-              className={cn({
-                player: true,
-                player_dead: dead,
-              })}
-            >
-              {turn && <ArrowRightAltIcon />}
-              {hearts}
-              <span>{player.nickname}</span>
-              {input}
-            </div>
-          );
-        })}
-      </div>
-    </div>
+  return (
+    <>
+      {gameState.desc === GameStateDesc.WaitingForPlayers && (
+        <WaitingForPlayersScreen {...props} gameState={gameState!} />
+      )}
+      {gameState.desc === GameStateDesc.Starting && (
+        <StartingScreen {...props} gameState={gameState} />
+      )}
+      {gameState.desc === GameStateDesc.Playing && (
+        <PlayingScreen {...props} gameState={gameState!} />
+      )}
+    </>
   );
-  switch (gameState.desc) {
-    case GameStateDesc.Playing:
-      {
-        return <div>{gameScreen}</div>;
-      }
-      break;
-    case GameStateDesc.WaitingForPlayers:
-      {
-        return (
-          <div>
-            <div className="waiting-for-players-msg">
-              Waiting for players... (need 2 to start the game)
-            </div>
-            {gameScreen}
-          </div>
-        );
-      }
-      break;
-    case GameStateDesc.Starting:
-      {
-        return (
-          <div>
-            <div className="starting-msg">
-              Starting: <span>{gameState.start_timer}</span>
-            </div>
-            {gameScreen}
-          </div>
-        );
-      }
-      break;
-    case GameStateDesc.Ended:
-      {
-        const winnerId = gameState["last_player_to_answer"]!;
-        const winner = gameState["players"][winnerId];
-        return (
-          <div>
-            <div className="game-ended">Game Ended. Winner is {winner.nickname}</div>
-            {gameScreen}
-          </div>
-        );
-      }
-      break;
-    default:
-      {
-        console.warn(`Invalid game state description: ${gameState.desc}.`);
-        return <div></div>;
-      }
-      break;
-  }
 };
 
-enum WSocketState {
-  Initial = 0,
-  Closed = 1,
-  Opened = 2,
-}
-
-interface WSocket<CT> {
-  send: (type: CT, msgPayload: any) => void;
-  state: WSocketState;
-}
-
-function useWSocket<CT, C, S>(msgHistoryListener: (msgHistory: S[]) => void): WSocket<CT> {
-  const socket = useRef<WebSocket | null>(null);
-  const [state, setState] = useState(WSocketState.Initial);
-  const onOpen = (event: any) => {
-    setState(WSocketState.Opened);
-  };
-  const onClose = (event: any) => {
-    setState(WSocketState.Closed);
-  };
-  const initSocket = () => {
-    socket.current = new WebSocket(WS_WORDS_API_URL);
-    socket.current.addEventListener("open", onOpen);
-    socket.current.addEventListener("close", onClose);
-  };
-  useEffect(() => {
-    initSocket();
-  }, []);
-  const send = (type: CT, m: any) => socket.current!.send(JSON.stringify({ type, ...m }));
-  // Handle messages
-  const [messageHistory, setMessageHistory] = useState<S[]>([]);
-  useEffect(() => {
-    const onMessage = (event: any) => {
-      const parsed = JSON.parse(event.data);
-      setMessageHistory([...messageHistory, parsed]);
-    };
-    socket.current!.addEventListener("message", onMessage);
-    return () => {
-      socket.current!.removeEventListener("message", onMessage);
-    };
-  }, [messageHistory]);
-  useEffect(() => {
-    if (messageHistory.length === 0) return;
-    msgHistoryListener(messageHistory);
-    setMessageHistory([]);
-  }, [messageHistory]);
-  return {
-    send,
-    state,
-  };
-}
-
-const NICKNAME_PARTICLES_FIRST = ["john", "adam", "nicholas", "donald", "mary"];
-const NICKNAME_PARTICLES_SECOND = ["red", "green", "smith", "duck", "yellow"];
+const NICKNAME_PARTICLES_FIRST = [
+  "red",
+  "green",
+  "yellow",
+  "fancy",
+  "curious",
+  "surprised",
+  "black",
+  "big",
+  "different",
+  "free",
+  "important",
+  "large",
+  "little",
+  "local",
+  "major",
+  "old",
+  "social",
+  "strong",
+  "white",
+];
+const NICKNAME_PARTICLES_SECOND = [
+  "squirrel",
+  "cat",
+  "elephant",
+  "rhino",
+  "monkey",
+  "dog",
+  "turtle",
+  "rabbit",
+  "parrot",
+  "kitten",
+  "hamster",
+  "mouse",
+  "snake",
+  "sheep",
+  "deer",
+  "horse",
+  "chicken",
+  "bee",
+  "turkey",
+  "cow",
+  "duck",
+];
 const generateInitialNickname = () => {
   const first = capitalize(randomChoice(NICKNAME_PARTICLES_FIRST));
   const second = capitalize(randomChoice(NICKNAME_PARTICLES_SECOND));
-  return `${first} ${second}`;
+  const num = Math.round(Math.random() * 1000);
+  return `${first} ${second} #${num}`;
 };
 
 const WordsGame = () => {
@@ -286,22 +371,32 @@ const WordsGame = () => {
   const [userGuess, setState] = useState<string>("");
   const [myId, setMyId] = useState<PlayerId>(-1);
   const resetState = () => setGameState(emptyGameState());
+  const [winner, setWinner] = useState<PlayerId | null>(null);
   const socket = useWSocket<CWMSG, ClientMessage, ServerMessage>(
+    WS_WORDS_API_URL,
     (messageHistory: ServerMessage[]) => {
       for (let i = 0; i < messageHistory.length; ++i) {
         const parsed = messageHistory[i];
         console.log(parsed);
         switch (parsed.type) {
+          // We get this after joining with a nickname
           case SWMSG.InitGame:
             {
-              setStep(WordsGameStep.Initial);
+              setStep(WordsGameStep.Playing);
               setGameState(parsed.state);
               setMyId(parsed.player.id);
             }
             break;
           case SWMSG.UpdateGameState:
             {
-              setGameState({ ...gameState, ...parsed.state });
+              const newState = parsed.state;
+              setGameState({ ...gameState, ...newState });
+            }
+            break;
+          case SWMSG.EndGame:
+            {
+              setStep(WordsGameStep.Ended);
+              setWinner(parsed.winner);
             }
             break;
           default:
@@ -331,15 +426,6 @@ const WordsGame = () => {
     socket.send(CWMSG.Joining, { nickname });
   };
 
-  // Change current local step depending on the game state
-  useEffect(() => {
-    if (gameState === null) {
-      setStep(WordsGameStep.Initial);
-    } else {
-      setStep(WordsGameStep.Playing);
-    }
-  }, [gameState]);
-
   // Render
   const game = useMemo(() => {
     switch (step) {
@@ -356,25 +442,26 @@ const WordsGame = () => {
         break;
       case WordsGameStep.Joining:
         {
-          return <div>Joining...</div>;
+          return <JoiningScreen />;
         }
         break;
       case WordsGameStep.Playing:
         {
-          return <GameScreen myId={myId} socket={socket} gameState={gameState} />;
+          return <GameScreen myId={myId} socket={socket} gameState={gameState} join={join} />;
+        }
+        break;
+      case WordsGameStep.Ended:
+        {
+          return <GameEndedScreen gameState={gameState!} myId={myId} join={join} winner={winner} />;
         }
         break;
       default: {
-        return <div>Invaild state</div>;
+        return <div>Invalid state: {step === undefined ? "empty" : step}</div>;
       }
     }
-  }, [step, gameState, nickname]);
+  }, [step, gameState, nickname, winner]);
 
-  return (
-    <Screen title="Words">
-      <div className="words-game">{game}</div>
-    </Screen>
-  );
+  return game;
 };
 
 export default WordsGame;

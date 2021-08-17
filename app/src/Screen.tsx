@@ -1,5 +1,7 @@
 import React, { useEffect } from "react";
 import Typography from "@material-ui/core/Typography";
+import Paper from "@material-ui/core/Paper";
+import { cn } from "./util";
 
 export const Screen = (props: { title: string; children: any }) => {
   useEffect(() => {
@@ -8,8 +10,12 @@ export const Screen = (props: { title: string; children: any }) => {
   return <div className="screen">{props.children}</div>;
 };
 
-export const ScreenContent = (props: { children: any }) => {
-  return <div className="screen-content">{props.children}</div>;
+export const ScreenContent = (props: { children: any; className?: string }) => {
+  return (
+    <Paper elevation={2} className={cn(["screen-content", props.className])}>
+      {props.children}
+    </Paper>
+  );
 };
 
 export const ScreenContentHeader = (props: { title: string; children?: any }) => {

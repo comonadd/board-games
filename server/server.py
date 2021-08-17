@@ -9,6 +9,7 @@ from aiohttp.http_websocket import WSCloseCode, WSMessage
 from dataclasses import dataclass, field, asdict
 from typing import Dict, Set, List
 import sys
+from datetime import datetime, timedelta
 
 # Environment
 from aiohttp.web_ws import WebSocketResponse
@@ -36,9 +37,10 @@ def configure_loggers():
 
 
 # Settings
-TIME_UNTIL_START = 4
-LIVES_INITIAL = 3
-MIN_PLAYERS_TO_START_GAME = 1
+TIME_UNTIL_START = 2
+LIVES_INITIAL = 2
+MIN_PLAYERS_TO_START_GAME = 2
+TICK_DURATION = 0.05
 TIME_TO_ANSWER = 5
 WORDS_DICT_PATH = "./russian-words/words.txt"
 PARTICLES_PATH = "./russian-words/particles.json"
@@ -87,6 +89,7 @@ class SWMSG:
     """ Server messages. """
     InitGame = 0
     UpdateGameState = 1
+    EndGame = 2
 
 
 class GameStateDesc:
@@ -94,7 +97,6 @@ class GameStateDesc:
     WaitingForPlayers = 0
     Playing = 1
     Starting = 2
-    Ended = 3
 
 Message = Dict
 PlayerId = int
@@ -105,6 +107,7 @@ class PlayerInfo:
     id: int = -1
     lives_left: int = LIVES_INITIAL
     nickname: str = None
+    input: str = ""
 
 
 @dataclass
@@ -149,7 +152,6 @@ async def ws_send_to_others(W: ServerState, si: ClientInfo, msg: Message):
     cuid = current_user_id(si)
     for _id, sock in W.clients.items():
         if _id != cuid:
-            print(_id)
             await sock.send_json(msg)
 
 
@@ -192,24 +194,23 @@ async def correct_guess(W: ServerState, player: PlayerInfo):
 
 def cycle_alive_players(players):
     while True:
-        player_dead_counted = 0
-        for p in players.keys():
-            player = players[p]
-            if player.lives_left == 0:
-                player_dead_counted += 1
-                if player_dead_counted >= len(players):
-                    # Everyone is dead so stop the iteration
-                    return
+        for pid in players.keys():
+            player = players[pid]
+            if player.lives_left <= 0:
                 continue
             else:
-                yield p, player
-                player_dead_counted = 0
+                yield pid, player
 
 
 async def end_game(W: ServerState):
     gs = W.game_state
-    gs.desc = GameStateDesc.Ended
-    await notify_of_su(W, "desc", "last_player_to_answer")
+    gs.desc = GameStateDesc.WaitingForPlayers
+    # Reset players
+    gs.players = {}
+    gs.particle = None
+    gs.whos_turn = -1
+    gs.start_timer = -1
+    await ws_send_to_all(W, { "type": SWMSG.EndGame, "winner": gs.last_player_to_answer })
 
 
 def particles_dict_for(W: ServerState, diff: Difficulty):
@@ -226,11 +227,12 @@ async def start_game(W: ServerState):
     gs.start_timer = TIME_UNTIL_START
     pdict = particles_dict_for(W, Difficulty.MIN_500)
     await notify_of_su(W, "desc", "start_timer")
-    for i in range(TIME_UNTIL_START, 0, -1):
-        gs.start_timer -= 1
+    while gs.start_timer > 0:
         await notify_of_su(W, "start_timer")
         await asyncio.sleep(1)
+        gs.start_timer -= 1
     gs.desc = GameStateDesc.Playing
+    await notify_of_su(W, "desc")
     pit = cycle_alive_players(gs.players)
     gs.last_player_to_answer = None
     try:
@@ -238,28 +240,32 @@ async def start_game(W: ServerState):
             # Process current turn
             player_id, player = next(pit)
             gs.last_player_to_answer = player_id
+            # If there is only one person left, end the game
+            players_alive = len(list(filter(lambda p: p.lives_left != 0, gs.players.values())))
+            if players_alive <= 1:
+                raise StopIteration()
             logger.debug("Processing player {}".format(player.nickname))
             particle = random.choice(pdict)
             # logger.debug("Guessing {}".format(correct_guess))
-            time_left = TIME_TO_ANSWER
+            time_end = datetime.now() + timedelta(seconds=TIME_TO_ANSWER)
             gs.whos_turn = player_id
             gs.particle = particle
             player.input = ""
             await notify_of_su(W, "whos_turn", "particle", "players", "last_player_to_answer")
             while True:
                 is_correct = is_guess_correct(W, gs.guess)
-                logger.debug(f"Guess: {gs.guess}, correct: {is_correct}")
+                # logger.debug(f"Guess: {gs.guess}, correct: {is_correct}")
                 if is_correct:
                     logger.debug("Correct guess!!")
                     await correct_guess(W, player)
-                    await asyncio.sleep(1)
                     break
-                if time_left <= 0:
-                    logger.debug("Failed")
+                curr_time = datetime.now()
+                out_of_time = curr_time >= time_end
+                if out_of_time:
+                    logger.debug("Time ran out")
                     await wrong_guess(W, player)
                     break
-                await asyncio.sleep(1)
-                time_left -= 1
+                await asyncio.sleep(TICK_DURATION)
     except StopIteration:
         # Game ended
         await end_game(W)
@@ -269,8 +275,7 @@ async def reset_game(W: ServerState):
     gs = W.game_state
     gs.desc = GameStateDesc.WaitingForPlayers
     gs.start_timer = -1
-    for _, player in gs.players.items():
-        player.input = ""
+    gs.players = {}
     gs.particle = None
     gs.whos_turn = -1
     await notify_of_su(W, "desc", "start_timer", "players", "particle", "whos_turn")
@@ -300,14 +305,17 @@ async def on_player_joined(W: ServerState, gs: GameState, si: ClientInfo, parsed
         si, {"type": SWMSG.InitGame, "state": asdict(gs), "player": asdict(new_player) })
     await notify_others_of_su(W, si, "players")
     if waiting_for_players(gs) and len(gs.players) >= MIN_PLAYERS_TO_START_GAME:
-        await start_game(W)
+        asyncio.ensure_future(start_game(W))
 
 async def on_player_input(W: ServerState, gs: GameState, si: ClientInfo, parsed: Message):
     # Can't update input if not your turn
     if si.id != gs.whos_turn:
         logger.warning(f"Player #{si.id} tried to update input during #{gs.whos_turn} player's turn")
         return
-    gs.players[si.id].input = parsed.input
+    player = gs.players[si.id]
+    logger.debug("processing player input:")
+    logger.debug(player)
+    player.input = parsed["input"]
     await notify_others_of_su(W, si, "players")
 
 async def on_player_submit(W: ServerState, gs: GameState, si: ClientInfo, parsed: Message):
@@ -315,8 +323,7 @@ async def on_player_submit(W: ServerState, gs: GameState, si: ClientInfo, parsed
     if si.id != gs.whos_turn:
         logger.warning(f"Player #{si.id} tried to submit guess during #{gs.whos_turn} player's turn")
         return
-    logger.debug(f"Submit guess: {parsed.guess}")
-    gs.guess = parsed.guess
+    gs.guess = parsed["guess"]
 
 ws_handlers_mapping = {
     CWMSG.Joining: on_player_joined,
@@ -392,11 +399,10 @@ async def words_game(request):
                     continue
                 await f(W, gs, si, parsed)
             elif msg.type == aiohttp.WSMsgType.ERROR:
-                print('ws connection closed with exception %s' % ws.exception())
+                logger.error('ws connection closed with exception %s' % ws.exception())
     finally:
         # When a connection is stopped, remove the connection
         await remove_player(W, si)
-        print("closing connection for id={}".format(pid))
     return ws
 
 

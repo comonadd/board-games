@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useRef, useEffect, useState } from "react";
 
-type CNArg = string[] | Record<string, boolean>;
+type CNArg = (string | undefined | null)[] | Record<string, boolean>;
 export const cn = (...cns: CNArg[]): string => {
   let res = "";
   for (let i = 0; i < cns.length; ++i) {
@@ -112,3 +112,59 @@ export const useMSTimer = (
     finished,
   };
 };
+
+export enum WSocketState {
+  Initial = 0,
+  Closed = 1,
+  Opened = 2,
+}
+
+export interface WSocket<CT> {
+  send: (type: CT, msgPayload: any) => void;
+  state: WSocketState;
+}
+
+export function useWSocket<CT, C, S>(
+  wsAPIURL: string,
+  msgHistoryListener: (msgHistory: S[]) => void
+): WSocket<CT> {
+  const socket = useRef<WebSocket | null>(null);
+  const [state, setState] = useState(WSocketState.Initial);
+  const onOpen = (event: any) => {
+    setState(WSocketState.Opened);
+  };
+  const onClose = (event: any) => {
+    setState(WSocketState.Closed);
+  };
+  const initSocket = () => {
+    socket.current = new WebSocket(wsAPIURL);
+    socket.current.addEventListener("open", onOpen);
+    socket.current.addEventListener("close", onClose);
+  };
+  useEffect(() => {
+    initSocket();
+  }, []);
+  const send = (type: CT, m: any) =>
+    socket.current!.send(JSON.stringify({ type, ...m }));
+  // Handle messages
+  const [messageHistory, setMessageHistory] = useState<S[]>([]);
+  useEffect(() => {
+    const onMessage = (event: any) => {
+      const parsed = JSON.parse(event.data);
+      setMessageHistory([...messageHistory, parsed]);
+    };
+    socket.current!.addEventListener("message", onMessage);
+    return () => {
+      socket.current!.removeEventListener("message", onMessage);
+    };
+  }, [messageHistory]);
+  useEffect(() => {
+    if (messageHistory.length === 0) return;
+    msgHistoryListener(messageHistory);
+    setMessageHistory([]);
+  }, [messageHistory]);
+  return {
+    send,
+    state,
+  };
+}
