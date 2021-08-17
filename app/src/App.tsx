@@ -27,14 +27,14 @@ const Header = () => {
   return (
     <header className="header">
       <div className="logo flex flex-c">Quiz Game v{version}</div>
-      <div>
-        <div>
+      <nav className="h-100">
+        <div className="nav-item">
           <Link to="/quiz">Quiz</Link>
         </div>
-        <div>
+        <div className="nav-item">
           <Link to="/words">Bomb Party Words</Link>
         </div>
-      </div>
+      </nav>
     </header>
   );
 };

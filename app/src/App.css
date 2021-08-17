@@ -149,12 +149,35 @@ html, body {
   border-bottom: 1px solid #eee;
   display: flex;
   justify-content: space-between;
+  padding: 16px;
+}
+
+
+.header nav {
+  display: flex;
+  flex-direction: row;
+}
+
+.header nav > .nav-item {
+  margin-right: 8px;
+  display: flex;
+  align-items: center;
+}
+
+.header nav > .nav-item > a {
+  font-size: 18px;
+}
+
+.header nav > .nav-item:last-child {
+  margin-right: 0;
 }
 
 .header .logo {
   height: 100%;
   font-size: 24px;
-  width: 120px;
+}
+
+.a {
 }
 
 .screen-title {
