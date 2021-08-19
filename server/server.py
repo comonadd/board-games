@@ -137,6 +137,7 @@ class ServerState:
     game_state: GameState = initial_game_state()
     clients: Dict[PlayerId, ClientInfo] = field(default_factory=lambda: {})
     ww: WordGameDict = WordGameDict()
+    game_handle = None
 
 
 async def ws_send_to_all(W: ServerState, msg: Message):
@@ -289,6 +290,10 @@ def waiting_for_players(gs: GameState):
     return gs.desc == GameStateDesc.WaitingForPlayers
 
 
+def starting_the_game(gs: GameState):
+    return gs.desc == GameStateDesc.Starting
+
+
 async def on_player_joined(W: ServerState, gs: GameState, si: ClientInfo, parsed: Message):
     # TODO: Don't allow new players to join if the game is already in progress
     nickname = parsed["nickname"]
@@ -304,8 +309,15 @@ async def on_player_joined(W: ServerState, gs: GameState, si: ClientInfo, parsed
     await send_to_user(
         si, {"type": SWMSG.InitGame, "state": asdict(gs), "player": asdict(new_player) })
     await notify_others_of_su(W, si, "players")
+
+    # If we're waiting for players, start the game
     if waiting_for_players(gs) and len(gs.players) >= MIN_PLAYERS_TO_START_GAME:
-        asyncio.create_task(start_game(W))
+        W.game_handle = asyncio.create_task(start_game(W))
+    elif starting_the_game(gs):
+        # Stop the starting sequence and restart it
+        assert W.game_handle is not None
+        W.game_handle.cancel()
+        W.game_handle = asyncio.create_task(start_game(W))
 
 async def on_player_input(W: ServerState, gs: GameState, si: ClientInfo, parsed: Message):
     # Can't update input if not your turn
