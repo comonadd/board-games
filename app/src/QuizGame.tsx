@@ -27,6 +27,10 @@ import {
   timerSeconds,
   useMSTimer,
 } from "./util";
+import {
+  THEMES_URL,
+  QUESTIONS_URL,
+} from "./constants";
 
 interface Question {
   text: string;
@@ -51,8 +55,9 @@ const useQuestions = (themes: Set<Theme>, shuffled: boolean) => {
   };
   useEffect(() => {
     (async () => {
-      const module = await import("../public/questions/questions.json");
-      const json = module.default;
+      console.info(`fetching questions at ${QUESTIONS_URL}`);
+      const resp = await fetch(QUESTIONS_URL);
+      const json = await resp.json();
       let qst: Question[] = [];
       themes.forEach((t: Theme) => {
         const qq = (json as any)[t] ?? [];
@@ -71,8 +76,9 @@ const useThemes = () => {
   const [themes, setThemes] = useState<Theme[]>([]);
   useEffect(() => {
     (async () => {
-      const module = await import("../public/questions/themes.json");
-      const json = module.default;
+      console.info(`fetching themes at ${THEMES_URL}`);
+      const resp = await fetch(THEMES_URL);
+      const json = await resp.json();
       setThemes(json);
     })();
   }, []);
