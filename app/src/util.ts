@@ -132,7 +132,7 @@ interface WSOptions {
 export function useWSocket<CT, C, S>(
   wsAPIURL: string,
   msgHistoryListener: (msgHistory: S[]) => void,
-  options: WSOptions,
+  options?: WSOptions,
 ): WSocket<CT> {
   const { retryOnFail = true, maxRetryAttempts = 3, retryTimeout = 500 } = options || {};
   const socket = useRef<WebSocket | null>(null);

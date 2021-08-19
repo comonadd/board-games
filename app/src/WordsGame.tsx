@@ -15,7 +15,7 @@ import {
   WSocket,
   useWSocket,
 } from "./util";
-import { Screen, ScreenContent, ScreenContentHeader, ScreenMessageContent } from "./Screen";
+import { Screen, ScreenContent, ScreenContentHeader } from "./Screen";
 import { MIN_PLAYERS_FOR_GAME, WS_WORDS_API_URL } from "./constants";
 import { t, tfmt } from "./ln";
 import ErrorOutlineIcon from '@material-ui/icons/ErrorOutline';
@@ -177,7 +177,7 @@ const GameTable = ({ gameState, socket, myId }: GameTableProps) => {
   const circleSize = 300;
 
   const players = Object.values(gameState?.players);
-  const playerIdxById = players.reduce((acc, p, idx) => {
+  const playerIdxById = players.reduce((acc: Record<PlayerId, number>, p, idx) => {
     acc[p.id] = idx;
     return acc;
   }, {});
@@ -210,7 +210,7 @@ const GameTable = ({ gameState, socket, myId }: GameTableProps) => {
       };
       return (
         <Paper elevation={1} key={pid} className="player-slot" style={style}>
-          <TablePlayer {...p} />
+          <TablePlayer myId={myId} {...p} />
         </Paper>
       );
     });

@@ -2,12 +2,12 @@ import React, { useEffect, useState, useContext, createContext } from "react";
 
 interface LocaleModule {
   s: Record<string, string>;
-  fmt: Record<string, (...args: any[]) => string>;
+  fmt: Record<string, string>;
 }
 interface ILContext {
   localeModule: LocaleModule;
 }
-const LContext = createContext<ILContext>({ localeModule: null });
+const LContext = createContext<ILContext>({} as any);
 
 export const t = (k: string) => {
   const { localeModule } = useContext(LContext);
@@ -38,7 +38,7 @@ export const tfmt = (k: string, ...args: any[]) => {
     } else if (ch === "{") {
       if (argIdx >= args.length) {
         console.error(
-          `Mismatch trying to format locale string "${k}": expected ${slotsFound} arguments, but only ${args.length} given.`,
+          `Mismatch trying to format locale string "${k}": expected at least ${argIdx} arguments, but only ${args.length} given.`,
         );
         return "N/A";
       }
@@ -71,7 +71,7 @@ export const tfmt = (k: string, ...args: any[]) => {
 
 const getBrowserLanguage = () => navigator.language;
 
-export const Localizator = (props: { children: React.Element; lang?: string }) => {
+export const Localizator = (props: { children: any; lang?: string }) => {
   const [localeModule, setLocaleModule] = useState<LocaleModule | null>(null);
   const [lang, setLang] = useState<string>(props.lang ?? getBrowserLanguage());
   useEffect(() => {
