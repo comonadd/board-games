@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 
 type CNArg = (string | undefined | null)[] | Record<string, boolean>;
 export const cn = (...cns: CNArg[]): string => {
@@ -114,7 +114,7 @@ export const useMSTimer = (
 };
 
 export enum WSocketState {
-  Initial = 0,
+  Connecting = 0,
   Closed = 1,
   Opened = 2,
 }
@@ -124,28 +124,58 @@ export interface WSocket<CT> {
   state: WSocketState;
 }
 
+interface WSOptions {
+  retryOnFail: boolean;
+  maxRetryAttempts: number;
+  retryTimeout: Milliseconds;
+}
 export function useWSocket<CT, C, S>(
   wsAPIURL: string,
-  msgHistoryListener: (msgHistory: S[]) => void
+  msgHistoryListener: (msgHistory: S[]) => void,
+  options: WSOptions,
 ): WSocket<CT> {
+  const { retryOnFail = true, maxRetryAttempts = 3, retryTimeout = 500 } = options || {};
   const socket = useRef<WebSocket | null>(null);
-  const [state, setState] = useState(WSocketState.Initial);
+  const [state, setState] = useState<WSocketState>(WSocketState.Connecting);
+
+  // Initialize socket
   const onOpen = (event: any) => {
+    console.info(`Connected to ${wsAPIURL}`);
     setState(WSocketState.Opened);
   };
+  const retryAttemptsLeft = useRef<number>(maxRetryAttempts);
   const onClose = (event: any) => {
-    setState(WSocketState.Closed);
+    if (retryOnFail && retryAttemptsLeft.current > 0) {
+      setState(WSocketState.Connecting);
+      console.info(`Failed to connect. Retrying... Attempts left: ${retryAttemptsLeft.current!}`);
+      retryAttemptsLeft.current = retryAttemptsLeft.current - 1;
+      setTimeout(() => {
+        initSocket();
+      }, retryTimeout);
+    } else {
+      setState(WSocketState.Closed);
+    }
   };
   const initSocket = () => {
-    socket.current = new WebSocket(wsAPIURL);
-    socket.current.addEventListener("open", onOpen);
-    socket.current.addEventListener("close", onClose);
+    let sock = new WebSocket(wsAPIURL);
+    sock.addEventListener("open", onOpen);
+    sock.addEventListener("close", onClose);
+    socket.current = sock;
   };
   useEffect(() => {
     initSocket();
   }, []);
-  const send = (type: CT, m: any) =>
+
+  // Send message
+  const send = (type: CT, m: any) => {
+    if (state !== WSocketState.Opened) {
+      console.warn("Trying to send messages on a closed socket");
+      return false;
+    }
     socket.current!.send(JSON.stringify({ type, ...m }));
+    return true;
+  };
+
   // Handle messages
   const [messageHistory, setMessageHistory] = useState<S[]>([]);
   useEffect(() => {
@@ -163,6 +193,8 @@ export function useWSocket<CT, C, S>(
     msgHistoryListener(messageHistory);
     setMessageHistory([]);
   }, [messageHistory]);
+
+  // Interface
   return {
     send,
     state,

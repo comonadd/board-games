@@ -75,6 +75,23 @@ html, body {
   flex-direction: column;
 }
 
+.screen-msg-title {
+  font-weight: bold;
+  font-size: 20px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.screen-msg {
+  background: #fff;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
 .answer-screen-content {
   display: flex;
   justify-content: space-between;
@@ -113,12 +130,24 @@ html, body {
   margin-right: 4px;
 }
 
+.ml-1 {
+  margin-left: 4px;
+}
+
 .mr-2 {
   margin-right: 8px;
 }
 
 .mb-2 {
   margin-bottom: 8px;
+}
+
+.mt-4 {
+  margin-top: 16px !important;
+}
+
+.p-4 {
+  padding: 16px;
 }
 
 .screen-content-header {
@@ -142,6 +171,14 @@ html, body {
 .flex-c {
   justify-content: center;
   align-items: center;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.flex-row {
+  flex-direction: row;
 }
 
 .header {
@@ -294,7 +331,7 @@ html, body {
 }
 
 .fs-18 {
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .fs-20 {

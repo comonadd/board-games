@@ -15,9 +15,10 @@ import {
   WSocket,
   useWSocket,
 } from "./util";
-import { Screen, ScreenContent, ScreenContentHeader } from "./Screen";
+import { Screen, ScreenContent, ScreenContentHeader, ScreenMessageContent } from "./Screen";
 import { MIN_PLAYERS_FOR_GAME, WS_WORDS_API_URL } from "./constants";
 import { t, tfmt } from "./ln";
+import ErrorOutlineIcon from '@material-ui/icons/ErrorOutline';
 
 enum CWMSG {
   Joining = 0,
@@ -130,7 +131,7 @@ const TablePlayer = (props: OtherTablePlayerProps) => {
       })}
     >
       <div className="player-nickname">
-        {player.nickname} {player.id === myId && <span>({t("you")})</span>}
+        {player.nickname} {player.id === myId && <span className="ml-1">({t("you")})</span>}
       </div>
       <PlayerHearts n={player.lives_left} />
       <div className="player-input">{player.input}</div>
@@ -213,7 +214,7 @@ const GameTable = ({ gameState, socket, myId }: GameTableProps) => {
         </Paper>
       );
     });
-  }, [gameState]);
+  }, [gameState, myId]);
 
   const renderedArrow = useMemo(() => {
     if (
@@ -285,6 +286,14 @@ const JoiningScreen = () => {
   );
 };
 
+const ConnectingScreen = () => {
+  return (
+    <Screen title={t("ent-nick")}>
+      <ScreenContent className="flex flex-c">{t("connecting")}</ScreenContent>
+    </Screen>
+  );
+};
+
 const PlayingScreen = (props: GameTableProps & { socket: WSocket<CWMSG>; myId: PlayerId }) => {
   const { gameState, socket, myId } = props;
   // Input
@@ -352,6 +361,26 @@ const ErrorGameInProgressScreen = (props: { tryAgain: () => void }) => {
     </Screen>
   );
 };
+
+const FailedToConnectScreen = (props: { retry: () => void; }) => {
+  const { retry } = props;
+  const title = t("failed-to-connect");
+  return (
+    <Screen title={title}>
+      <Paper elevation={1} className="screen-msg">
+        <div className="screen-msg-title">
+          <ErrorOutlineIcon style={{ fontSize: 30, color: "grey" }} className="mr-2" />
+          <div>Something went wrong</div>
+        </div>
+        <div className="fcg fs-18">{t("failed-to-connect")}</div>
+        <Button onClick={retry} variant="contained" color="primary" size="large" className="w-100 mt-4">
+          {t("try-again")}
+        </Button>
+      </Paper>
+    </Screen>
+  );
+};
+
 const GameScreen = (props: {
   socket: WSocket<CWMSG>;
   myId: PlayerId;
@@ -442,6 +471,15 @@ const WordsGame = () => {
 
   // Render
   const game = useMemo(() => {
+    const retry = () => setStep(WordsGameStep.Initial);
+    switch (socket.state) {
+      case WSocketState.Connecting: {
+        return <ConnectingScreen />;
+      } break;
+      case WSocketState.Closed: {
+        return <FailedToConnectScreen retry={retry} />;
+      } break;
+    }
     switch (step) {
       case WordsGameStep.Initial:
         {
@@ -478,7 +516,7 @@ const WordsGame = () => {
         return <div>Invalid state: {step === undefined ? "empty" : step}</div>;
       }
     }
-  }, [step, gameState, nickname, winner]);
+  }, [step, gameState, nickname, winner, socket.state]);
 
   return game;
 };
