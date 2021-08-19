@@ -29,6 +29,7 @@ enum SWMSG {
   InitGame = 0,
   UpdateGameState = 1,
   EndGame = 2,
+  GameInProgress = 3,
 }
 
 type PlayerId = number;
@@ -59,6 +60,7 @@ enum WordsGameStep {
   Joining = 1,
   Playing = 2,
   Ended = 3,
+  ErrorGameInProgress = 4,
 }
 
 interface ClientMessage extends Record<string, any> {
@@ -336,6 +338,20 @@ const PlayingScreen = (props: GameTableProps & { socket: WSocket<CWMSG>; myId: P
   );
 };
 
+const ErrorGameInProgressScreen = (props: { tryAgain: () => void }) => {
+  const { tryAgain } = props;
+  return (
+    <Screen title={t("game-in-progress")}>
+      <ScreenContent className="flex flex-c">
+        <div>
+          <Button onClick={tryAgain} variant="contained" color="primary">
+            {t("try-again")}
+          </Button>
+        </div>
+      </ScreenContent>
+    </Screen>
+  );
+};
 const GameScreen = (props: {
   socket: WSocket<CWMSG>;
   myId: PlayerId;
@@ -393,6 +409,11 @@ const WordsGame = () => {
               setWinner(parsed.winner);
             }
             break;
+          case SWMSG.GameInProgress:
+            {
+              setStep(WordsGameStep.ErrorGameInProgress);
+            }
+            break;
           default:
             {
               console.warn("Unhandled message");
@@ -431,6 +452,11 @@ const WordsGame = () => {
               join={join}
             />
           );
+        }
+        break;
+      case WordsGameStep.ErrorGameInProgress:
+        {
+          return <ErrorGameInProgressScreen tryAgain={retry} />;
         }
         break;
       case WordsGameStep.Joining:

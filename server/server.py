@@ -7,8 +7,7 @@ from enum import Enum
 from aiohttp import web
 from aiohttp.http_websocket import WSCloseCode, WSMessage
 from dataclasses import dataclass, field, asdict
-from typing import Dict, Set, List
-import sys
+from typing import Dict, Set, List, Optional
 from datetime import datetime, timedelta
 
 # Environment
@@ -37,8 +36,8 @@ def configure_loggers():
 
 
 # Settings
-TIME_UNTIL_START = 2
-LIVES_INITIAL = 2
+TIME_UNTIL_START = 15
+LIVES_INITIAL = 5
 MIN_PLAYERS_TO_START_GAME = 2
 TICK_DURATION = 0.05
 TIME_TO_ANSWER = 5
@@ -90,6 +89,7 @@ class SWMSG:
     InitGame = 0
     UpdateGameState = 1
     EndGame = 2
+    GameInProgress = 3
 
 
 class GameStateDesc:
@@ -293,9 +293,14 @@ def waiting_for_players(gs: GameState):
 def starting_the_game(gs: GameState):
     return gs.desc == GameStateDesc.Starting
 
+def is_game_in_progress(gs: GameState):
+    return gs.desc == GameStateDesc.Playing
 
 async def on_player_joined(W: ServerState, gs: GameState, si: ClientInfo, parsed: Message):
     # TODO: Don't allow new players to join if the game is already in progress
+    if is_game_in_progress(gs):
+        await send_to_user(si, { "type": SWMSG.GameInProgress })
+        return
     nickname = parsed["nickname"]
     logger.debug("{} is joining".format(nickname))
     # We ahve enough players to start the game
@@ -352,6 +357,14 @@ def next_player_id():
     __player_id += 1
     return __player_id
 
+def get_player(W: ServerState, pid: PlayerId) -> PlayerInfo:
+    return W.game_state.players.get(pid, None)
+
+def player_name(W: ServerState, pid: PlayerId) -> Optional[str]:
+    p = get_player(W, pid)
+    if p is None:
+        return None
+    return p.nickname
 
 async def remove_player(W: ServerState, si: ClientInfo):
     pid = si.id
