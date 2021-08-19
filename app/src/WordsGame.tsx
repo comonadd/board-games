@@ -114,21 +114,24 @@ interface OtherTablePlayerProps {
   player: PlayerInfo;
   gameState: GameState;
   playerTurn: boolean;
+  myId: PlayerId;
 }
 const TablePlayer = (props: OtherTablePlayerProps) => {
-  const { player, playerTurn, gameState } = props;
+  const { myId, player, playerTurn, gameState } = props;
   const dead = player.lives_left === 0;
   return (
     <div
       className={cn({
         player: true,
         player_dead: dead,
+        player_turn: playerTurn,
       })}
     >
-      {playerTurn && <ArrowRightAltIcon />}
-      <div className="player-nickname">{player.nickname}</div>
+      <div className="player-nickname">
+        {player.nickname} {player.id === myId && <span>({t("you")})</span>}
+      </div>
       <PlayerHearts n={player.lives_left} />
-      {playerTurn && <span>{player.input}</span>}
+      <div className="player-input">{player.input}</div>
     </div>
   );
 };
@@ -170,8 +173,12 @@ const GameTable = ({ gameState, socket, myId }: GameTableProps) => {
   const angle = 360 / Object.keys(gameState?.players).length;
   const circleSize = 300;
 
+  const players = Object.values(gameState?.players);
+  const playerIdxById = players.reduce((acc, p, idx) => {
+    acc[p.id] = idx;
+    return acc;
+  }, {});
   const renderedPlayers = useMemo(() => {
-    const players = Object.values(gameState?.players);
     if (players.length === 0) return <div>No players joined yet</div>;
     if (players.length === 1) {
       const pid = players[0].id;
@@ -181,6 +188,7 @@ const GameTable = ({ gameState, socket, myId }: GameTableProps) => {
             gameState={gameState}
             player={players[0]}
             playerTurn={gameState.whos_turn === pid}
+            myId={myId}
           />
         </Paper>
       );
@@ -205,10 +213,36 @@ const GameTable = ({ gameState, socket, myId }: GameTableProps) => {
     });
   }, [gameState]);
 
+  const renderedArrow = useMemo(() => {
+    if (
+      gameState.whos_turn === undefined ||
+      gameState.whos_turn === null ||
+      gameState.whos_turn === -1
+    ) {
+      return null;
+    }
+    const rot = playerIdxById[gameState.whos_turn as any] * angle;
+    const style = {
+      transform: `rotate(${rot}deg)`,
+    };
+    return (
+      <div className="wg-turn-arrow" style={style}>
+        <ArrowRightAltIcon
+          style={{
+            fontSize: 80,
+          }}
+        />
+      </div>
+    );
+  }, [gameState.whos_turn]);
+
   return (
     <div className="player-table">
       <div className="player-table-center">
-        {gameState.particle && <div className="particle-to-guess">{gameState.particle}</div>}
+        {gameState.particle && (
+          <div className="particle-to-guess">{gameState.particle.toUpperCase()}</div>
+        )}
+        {renderedArrow}
         {renderedPlayers}
       </div>
     </div>
