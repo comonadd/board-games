@@ -218,7 +218,7 @@ def particles_dict_for(W: ServerState, diff: Difficulty):
 
 
 def is_guess_correct(W: ServerState, guess: str) -> bool:
-    return len(guess) >= MIN_PARTICLE_LENGTH and guess in W.ww.words
+    return len(guess) >= MIN_PARTICLE_LENGTH and guess in W.ww.words and W.game_state.particle in guess
 
 
 async def start_game(W: ServerState):
