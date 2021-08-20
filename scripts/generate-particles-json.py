@@ -2,7 +2,7 @@ import os
 import json
 from collections import Counter, defaultdict
 
-dictionary_path = "./russian-words/russian.txt"
+dictionary_path = "./russian-words/words.txt"
 output_file = "./public/particles.json"
 PARTICLE_LENGTH = 3
 

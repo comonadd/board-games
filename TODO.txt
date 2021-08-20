@@ -1,0 +1,13 @@
+sometimes whos_turn doesn't update for some players
+padding ofr players
+correct colors
+if player doesn't guess, transfer to next player, until cycle is complete
+cycle is probably broken, since "player tried to guess during  other's player turn" pops up
+reset guess when incorrect
+implement bot for testing purposes
+
+cities
+countries
+companies
+
+
