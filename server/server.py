@@ -41,8 +41,8 @@ LIVES_INITIAL = 5
 MIN_PLAYERS_TO_START_GAME = 2
 TICK_DURATION = 0.05
 TIME_TO_ANSWER = 5
-WORDS_DICT_PATH = "./russian-words/words.txt"
-PARTICLES_PATH = "./russian-words/particles.json"
+WORDS_DICT_PATH = "./assets/words.txt"
+PARTICLES_PATH = "./assets/particles.json"
 MIN_PARTICLE_LENGTH = 3
 
 
@@ -63,7 +63,7 @@ class WordGameDict:
 def load_dictionary(words_dict_path: str, particles_path: str) -> WordGameDict:
     ww = WordGameDict()
     logger.info("Loading dictionary...")
-    with open(words_dict_path, "r", encoding="windows-1251") as f:
+    with open(words_dict_path, "r", encoding="utf-8") as f:
         for word in f.readlines():
             w = word[:-1] # don't include the newline
             ww.words.add(w)

@@ -8,5 +8,9 @@ src/questions.json
 src/themes.json
 public
 __pycache__
-russian-words/
 .log/
+server/assets/
+russian-words/*
+!russian-words/region.csv
+!russian-words/city.csv
+!russian-words/country.csv
