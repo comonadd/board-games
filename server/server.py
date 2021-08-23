@@ -216,6 +216,8 @@ async def wrong_guess(W: ServerState, player: PlayerInfo):
     await ws_send_to_all(W, { "type": SWMSG.WrongGuess, "id": player.id })
 
 
+reward_random_letters = True
+
 async def correct_guess(W: ServerState, player: PlayerInfo, guess: str):
     gs = W.game_state
     gs.used_words.add(guess)
@@ -225,6 +227,11 @@ async def correct_guess(W: ServerState, player: PlayerInfo, guess: str):
         k = ord(letter.lower())
         if k in player.letters_left:
             player.letters_left.remove(k)
+    # Reward random letter
+    if reward_random_letters:
+        letter = random.choice(list(player.letters_left))
+        player.letters_left.remove(letter)
+        logger.debug(f"Random letter rewarded: {letter}")
     logger.debug(f"player={player.nickname}, letters_left={' '.join(list(map(lambda x: chr(x), player.letters_left)))}")
     if len(player.letters_left) == 0:
         player.lives_left += 1
