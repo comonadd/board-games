@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState, useEffect } from "react";
+import React, { useReducer, useMemo, useRef, useState, useEffect } from "react";
 import Input from "@material-ui/core/Input";
 import "./App.css";
 import Paper from "@material-ui/core/Paper";
@@ -6,19 +6,11 @@ import Button from "@material-ui/core/Button";
 import Typography from "@material-ui/core/Typography";
 import FavoriteIcon from "@material-ui/icons/Favorite";
 import ArrowRightAltIcon from "@material-ui/icons/ArrowRightAlt";
-import {
-  generateInitialNickname,
-  cn,
-  capitalize,
-  randomChoice,
-  WSocketState,
-  WSocket,
-  useWSocket,
-} from "./util";
+import { generateInitialNickname, cn, WSocketState, WSocket, useWSocket } from "./util";
 import { Screen, ScreenContent, ScreenContentHeader } from "./Screen";
 import { MIN_PLAYERS_FOR_GAME, WS_WORDS_API_URL } from "./constants";
 import { t, tfmt } from "./ln";
-import ErrorOutlineIcon from '@material-ui/icons/ErrorOutline';
+import ErrorOutlineIcon from "@material-ui/icons/ErrorOutline";
 import Immutable, { Map, List } from "immutable";
 
 enum CWMSG {
@@ -83,8 +75,15 @@ interface ServerMessage extends Record<string, any> {
   type: SWMSG;
 }
 
-const emptyGameState = (): GameState | null => {
-  return null;
+const emptyGameState = (): GameState => {
+  return Map({
+    players: Map({}),
+    whos_turn: -1,
+    desc: GameStateDesc.WaitingForPlayers,
+    particle: null,
+    last_player_to_answer: null,
+    start_timer: -1,
+  });
 };
 
 const InitialScreen = (props: {
@@ -126,12 +125,12 @@ const PlayerHearts = React.memo(({ n }: { n: number }) => {
 
 interface OtherTablePlayerProps {
   player: PlayerInfo;
-  gameState: GameState;
   playerTurn: boolean;
-  myId: PlayerId;
+  C: ClientState;
 }
 const TablePlayer = (props: OtherTablePlayerProps) => {
-  const { myId, player, playerTurn, gameState } = props;
+  const { C, player, playerTurn } = props;
+  const myId = C.get("myId");
   const dead = player.get("lives_left") === 0;
   return (
     <div
@@ -142,7 +141,8 @@ const TablePlayer = (props: OtherTablePlayerProps) => {
       })}
     >
       <div className="player-nickname">
-        {player.get("nickname")} {player.get("id") === myId && <span className="ml-1">({t("you")})</span>}
+        {player.get("nickname")}{" "}
+        {player.get("id") === myId && <span className="ml-1">({t("you")})</span>}
       </div>
       <PlayerHearts n={player.get("lives_left")} />
       <div className="player-input">{player.get("input")}</div>
@@ -151,19 +151,23 @@ const TablePlayer = (props: OtherTablePlayerProps) => {
 };
 
 interface GameEndedScreenProps {
-  myId: PlayerId;
-  winner: PlayerInfo;
   join: () => void;
-  gameState: GameState;
+  C: ClientState;
 }
 
-const GameEndedScreen = ({ myId, join, gameState, winner }: GameEndedScreenProps) => {
+const GameEndedScreen = ({ join, C }: GameEndedScreenProps) => {
+  const winner = C.get("winner");
+  const myId = C.get("myId");
   return (
     <Screen title="Game Ended">
       <ScreenContent className="flex flex-col game-ended-message flex flex-c">
         <div className="mb-4">
           <Typography component="h1" variant="h5">
-            {winner.id === myId ? t("game-ended-me") : tfmt("game-ended", winner.get("nickname"))}
+            {winner
+              ? winner.get("id") === myId
+                ? t("game-ended-me")
+                : tfmt("game-ended", winner.get("nickname"))
+              : "N/A"}
           </Typography>
         </div>
         <Button onClick={join} color="primary" variant="contained" size="large" className="ph-16">
@@ -177,12 +181,13 @@ const GameEndedScreen = ({ myId, join, gameState, winner }: GameEndedScreenProps
 };
 
 interface GameTableProps {
-  gameState: GameState;
-  myId: PlayerId;
+  C: ClientState;
   socket: WSocket<CWMSG>;
 }
 
-const GameTable = ({ gameState, socket, myId }: GameTableProps) => {
+const GameTable = ({ C, socket }: GameTableProps) => {
+  const gameState = C.get("gameState");
+  const myId = C.get("myId");
   const angle = 360 / gameState.get("players").size;
   const circleSize = 300;
   const playersById = gameState.get("players");
@@ -198,10 +203,9 @@ const GameTable = ({ gameState, socket, myId }: GameTableProps) => {
       return (
         <Paper elevation={1} key={pid} className="player-slot">
           <TablePlayer
-            gameState={gameState}
             player={players.get(0)!}
             playerTurn={gameState.get("whos_turn") === pid}
-            myId={myId}
+            C={C}
           />
         </Paper>
       );
@@ -220,7 +224,7 @@ const GameTable = ({ gameState, socket, myId }: GameTableProps) => {
       };
       return (
         <Paper elevation={1} key={pid} className="player-slot" style={style}>
-          <TablePlayer myId={myId} {...p} />
+          <TablePlayer C={C} {...p} />
         </Paper>
       );
     });
@@ -228,11 +232,7 @@ const GameTable = ({ gameState, socket, myId }: GameTableProps) => {
 
   const renderedArrow = useMemo(() => {
     const t = gameState.get("whos_turn");
-    if (
-      t === undefined ||
-      t === null ||
-      t === -1
-    ) {
+    if (t === undefined || t === null || t === -1) {
       return null;
     }
     const rot = playerIdxById[gameState.get("whos_turn") as any] * angle;
@@ -264,7 +264,8 @@ const GameTable = ({ gameState, socket, myId }: GameTableProps) => {
 };
 
 const StartingScreen = (props: GameTableProps) => {
-  const ts = tfmt("starting", props.gameState.get("start_timer"));
+  const gs = props.C.get("gameState");
+  const ts = tfmt("starting", gs.get("start_timer"));
   return (
     <Screen title={ts}>
       <ScreenContent>
@@ -276,7 +277,7 @@ const StartingScreen = (props: GameTableProps) => {
 };
 
 const WaitingForPlayersScreen = (props: GameTableProps) => {
-  const gs = props.gameState;
+  const gs = props.C.get("gameState");
   return (
     <Screen title={t("waiting-players")}>
       <ScreenContent>
@@ -305,8 +306,10 @@ const ConnectingScreen = () => {
   );
 };
 
-const PlayingScreen = (props: GameTableProps & { socket: WSocket<CWMSG>; myId: PlayerId }) => {
-  const { gameState, socket, myId } = props;
+const PlayingScreen = (props: GameTableProps & { socket: WSocket<CWMSG> }) => {
+  const { C, socket } = props;
+  const gameState = C.get("gameState");
+  const myId = C.get("myId");
   // Input
   const myTurn = gameState.get("whos_turn") === myId;
   const [userInput, setUserInput] = useState<string>("");
@@ -340,7 +343,7 @@ const PlayingScreen = (props: GameTableProps & { socket: WSocket<CWMSG>; myId: P
     <Screen title="Playing">
       <ScreenContent>
         <ScreenContentHeader title={t("in-game")} />
-        <GameTable {...props} gameState={gameState!} />
+        <GameTable {...props} C={C} />
         {myTurn && (
           <Input
             value={userInput}
@@ -372,7 +375,7 @@ const ErrorGameInProgressScreen = (props: { tryAgain: () => void }) => {
   );
 };
 
-const FailedToConnectScreen = (props: { retry: () => void; }) => {
+const FailedToConnectScreen = (props: { retry: () => void }) => {
   const { retry } = props;
   const title = t("failed-to-connect");
   return (
@@ -383,7 +386,13 @@ const FailedToConnectScreen = (props: { retry: () => void; }) => {
           <div>Something went wrong</div>
         </div>
         <div className="fcg fs-18">{t("failed-to-connect")}</div>
-        <Button onClick={retry} variant="contained" color="primary" size="large" className="w-100 mt-4">
+        <Button
+          onClick={retry}
+          variant="contained"
+          color="primary"
+          size="large"
+          className="w-100 mt-4"
+        >
           {t("try-again")}
         </Button>
       </Paper>
@@ -391,94 +400,154 @@ const FailedToConnectScreen = (props: { retry: () => void; }) => {
   );
 };
 
-const GameScreen = (props: {
-  socket: WSocket<CWMSG>;
-  myId: PlayerId;
-  gameState: GameState | null;
-  join: () => void;
-}) => {
-  const { join, socket, myId, gameState } = props;
+const GameScreen = (props: { socket: WSocket<CWMSG>; join: () => void; C: ClientState }) => {
+  const { C, join, socket } = props;
+  const myId = C.get("myId");
+  const gameState = C.get("gameState");
   if (gameState === null) return <div>Loading...</div>;
   return (
     <>
       {gameState.get("desc") === GameStateDesc.WaitingForPlayers && (
-        <WaitingForPlayersScreen {...props} gameState={gameState!} />
+        <WaitingForPlayersScreen {...props} C={C} />
       )}
-      {gameState.get("desc") === GameStateDesc.Starting && (
-        <StartingScreen {...props} gameState={gameState} />
-      )}
-      {gameState.get("desc") === GameStateDesc.Playing && (
-        <PlayingScreen {...props} gameState={gameState!} />
-      )}
+      {gameState.get("desc") === GameStateDesc.Starting && <StartingScreen {...props} C={C} />}
+      {gameState.get("desc") === GameStateDesc.Playing && <PlayingScreen {...props} C={C} />}
     </>
   );
 };
 
+enum ActionType {
+  ServerMessage = 0,
+  ResetState = 1,
+  SetStep = 2,
+}
+
+interface ClientAction {
+  type: ActionType;
+  payload?: any;
+}
+
+type ClientState = ImmutableMap<{
+  step: WordsGameStep;
+  gameState: GameState;
+  myId: PlayerId | null;
+  winner: PlayerInfo | null;
+}>;
+
+const initialClientState: ClientState = Map({
+  step: WordsGameStep.Initial,
+  gameState: emptyGameState(),
+  myId: null,
+  winner: null,
+});
+
+const serverMessageReducer = (state: ClientState, msg: ServerMessage): ClientState => {
+  const parsed = msg;
+  console.log(parsed);
+  switch (parsed.type) {
+    // We get this after joining with a nickname
+    case SWMSG.InitGame:
+      {
+        console.log("asdfasdfasdf");
+        state = state.set("step", WordsGameStep.Playing);
+        state = state.set("gameState", Map(Immutable.fromJS(parsed.state) as any));
+        state = state.set("myId", parsed.player.id);
+        return state;
+      }
+      break;
+    case SWMSG.UpdateGameState:
+      {
+        // Generic game state update
+        return state.updateIn(["gameState"], (gs: GameState) =>
+          gs.merge(Map(Immutable.fromJS(parsed.state) as any) as any),
+        );
+      }
+      break;
+    case SWMSG.PlayerJoined:
+      {
+        const nextState = state.updateIn(["gameState", "players"], (players: PlayerInfoById) =>
+          players.set(parsed.player.id, Map(parsed.player)),
+        );
+        return nextState;
+      }
+      break;
+    case SWMSG.RemovePlayer:
+      {
+        const nextState = state.updateIn(["gameState", "players"], (players: PlayerInfoById) =>
+          players.remove(parsed.id),
+        );
+        return nextState;
+      }
+      break;
+    case SWMSG.UserInput:
+      {
+        return state!.setIn(["gameState", "players", parsed.id.toString(), "input"], parsed.input);
+      }
+      break;
+    case SWMSG.EndGame:
+      {
+        state = state.set("step", WordsGameStep.Ended);
+        state = state.set("winner", Map(parsed.winner));
+        return state;
+      }
+      break;
+    case SWMSG.GameInProgress:
+      {
+        return state.set("step", WordsGameStep.ErrorGameInProgress);
+      }
+      break;
+    default:
+      {
+        console.warn("Unhandled message");
+        console.warn(parsed);
+        return state;
+      }
+      break;
+  }
+};
+
+const gameStateReducer = (state: ClientState, action: ClientAction): ClientState => {
+  console.group("reducer dispatch");
+  console.log(action);
+  console.log(state);
+  console.groupEnd("reducer dispatch");
+  const parsed = action;
+  switch (action.type) {
+    case ActionType.ServerMessage:
+      {
+        return serverMessageReducer(state, action.payload);
+      }
+      break;
+    case ActionType.ResetState:
+      {
+        return initialClientState;
+      }
+      break;
+    case ActionType.SetStep:
+      {
+        return state.set("step", action.payload);
+      }
+      break;
+    default:
+      {
+        console.warn("Unknown action");
+        return state;
+      }
+      break;
+  }
+};
+
 const WordsGame = () => {
   const [nickname, setNickname] = useState<string>(generateInitialNickname());
-  const [step, setStep] = useState<WordsGameStep>(WordsGameStep.Initial);
-  const [gameState, setGameState] = useState<GameState | null>(emptyGameState());
+  const [C, dispatch] = useReducer<typeof gameStateReducer>(gameStateReducer, initialClientState);
   const [userGuess, setState] = useState<string>("");
-  const [myId, setMyId] = useState<PlayerId>(-1);
-  const resetState = () => setGameState(emptyGameState());
-  const [winner, setWinner] = useState<PlayerInfo | null>(null);
+  const resetState = () => dispatch({ type: ActionType.ResetState });
   const socket = useWSocket<CWMSG, ClientMessage, ServerMessage>(
     WS_WORDS_API_URL,
     (messageHistory: ServerMessage[]) => {
       for (let i = 0; i < messageHistory.length; ++i) {
         const parsed = messageHistory[i];
-        switch (parsed.type) {
-          // We get this after joining with a nickname
-          case SWMSG.InitGame:
-            {
-              setStep(WordsGameStep.Playing);
-              const initial = Map(Immutable.fromJS(parsed.state) as any);
-              setGameState(initial);
-              setMyId(parsed.player.id);
-            }
-            break;
-          case SWMSG.UpdateGameState:
-            {
-              const newState = gameState!.merge(Map(Immutable.fromJS(parsed.state) as any) as any);
-              setGameState(newState);
-            }
-            break;
-          case SWMSG.PlayerJoined:
-            {
-              const nextState = gameState!.updateIn(["players"], (players: PlayerInfoById) =>
-                players.set(parsed.player.id, Map(parsed.player)));
-              setGameState(nextState);
-            }
-            break;
-          case SWMSG.RemovePlayer:
-            {
-              const nextState = gameState!.updateIn(["players"], (players: PlayerInfoById) => players.remove(parsed.id));
-              setGameState(nextState);
-            }
-            break;
-          case SWMSG.UserInput:
-            {
-              setGameState(gameState!.setIn(["players", parsed.id.toString(), "input"], parsed.input));
-            }
-            break;
-          case SWMSG.EndGame:
-            {
-              setStep(WordsGameStep.Ended);
-              setWinner(Map(parsed.winner));
-            }
-            break;
-          case SWMSG.GameInProgress:
-            {
-              setStep(WordsGameStep.ErrorGameInProgress);
-            }
-            break;
-          default:
-            {
-              console.warn("Unhandled message");
-              console.warn(parsed);
-            }
-            break;
-        }
+        dispatch({ type: ActionType.ServerMessage, payload: parsed });
       }
     },
   );
@@ -494,21 +563,31 @@ const WordsGame = () => {
   }, [socket.state]);
 
   const join = () => {
-    setStep(WordsGameStep.Joining);
+    dispatch({ type: ActionType.SetStep, payload: WordsGameStep.Joining });
     socket.send(CWMSG.Joining, { nickname });
   };
 
   // Render
   const game = useMemo(() => {
-    const retry = () => setStep(WordsGameStep.Initial);
+    console.log("C updated, re-rendering the game");
+    console.log(C.toJS());
+    const retry = () => {
+      socket.reset();
+      resetState();
+    };
     switch (socket.state) {
-      case WSocketState.Connecting: {
-        return <ConnectingScreen />;
-      } break;
-      case WSocketState.Closed: {
-        return <FailedToConnectScreen retry={retry} />;
-      } break;
+      case WSocketState.Connecting:
+        {
+          return <ConnectingScreen />;
+        }
+        break;
+      case WSocketState.Closed:
+        {
+          return <FailedToConnectScreen retry={retry} />;
+        }
+        break;
     }
+    const step = C.get("step");
     switch (step) {
       case WordsGameStep.Initial:
         {
@@ -533,19 +612,19 @@ const WordsGame = () => {
         break;
       case WordsGameStep.Playing:
         {
-          return <GameScreen myId={myId} socket={socket} gameState={gameState} join={join} />;
+          return <GameScreen socket={socket} C={C} join={join} />;
         }
         break;
       case WordsGameStep.Ended:
         {
-          return <GameEndedScreen gameState={gameState!} myId={myId} join={join} winner={winner} />;
+          return <GameEndedScreen join={join} C={C} />;
         }
         break;
       default: {
         return <div>Invalid state: {step === undefined ? "empty" : step}</div>;
       }
     }
-  }, [step, gameState, nickname, winner, socket.state]);
+  }, [C, nickname, socket.state]);
 
   return game;
 };

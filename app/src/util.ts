@@ -122,6 +122,7 @@ export enum WSocketState {
 export interface WSocket<CT> {
   send: (type: CT, msgPayload: any) => void;
   state: WSocketState;
+  reset: () => void;
 }
 
 interface WSOptions {
@@ -157,14 +158,21 @@ export function useWSocket<CT, C, S>(
     }
   };
   const initSocket = () => {
-    let sock = new WebSocket(wsAPIURL);
-    sock.addEventListener("open", onOpen);
-    sock.addEventListener("close", onClose);
-    socket.current = sock;
+    try {
+      let sock = new WebSocket(wsAPIURL);
+      sock.addEventListener("open", onOpen);
+      sock.addEventListener("close", onClose);
+      socket.current = sock;
+    } catch (err) {}
   };
   useEffect(() => {
     initSocket();
   }, []);
+  const reset = () => {
+    retryAttemptsLeft.current = maxRetryAttempts;
+    setState(WSocketState.Connecting);
+    initSocket();
+  };
 
   // Send message
   const send = (type: CT, m: any) => {
@@ -198,6 +206,7 @@ export function useWSocket<CT, C, S>(
   return {
     send,
     state,
+    reset,
   };
 }
 
