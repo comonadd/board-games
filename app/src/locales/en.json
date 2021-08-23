@@ -9,7 +9,8 @@
     "try-again": "Try again",
     "you": "You",
     "connecting": "Connecting...",
-    "failed-to-connect": "Failed to connect"
+    "failed-to-connect": "Failed to connect",
+    "user-input-answer": "Your answer"
   },
   "fmt": {
     "waiting-players": "Waiting for players ({}/{})",

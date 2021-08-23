@@ -10,7 +10,8 @@
     "try-again": "Попробовать ещё раз",
     "in-game": "Игра уже началась",
     "connecting": "Подключение...",
-    "failed-to-connect": "Не удалось подключиться"
+    "failed-to-connect": "Не удалось подключиться",
+    "user-input-answer": "Введите ответ"
   },
   "fmt": {
     "waiting-players": "Ожидание игроков ({}/{})",

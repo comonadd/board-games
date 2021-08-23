@@ -40,7 +40,7 @@ TIME_UNTIL_START = 2
 LIVES_INITIAL = 2
 MIN_PLAYERS_TO_START_GAME = 2
 TICK_DURATION = 0.05
-TIME_TO_ANSWER = 2
+TIME_TO_ANSWER = 40
 WORDS_DICT_PATH = "./assets/words.txt"
 PARTICLES_PATH = "./assets/particles.json"
 MIN_PARTICLE_LENGTH = 3
@@ -94,6 +94,7 @@ class SWMSG:
     UserInput = 4
     PlayerJoined = 5
     RemovePlayer = 6
+    WrongGuess = 7
 
 
 class GameStateDesc:
@@ -127,6 +128,7 @@ class GameState:
     guess: str = ""  # User guess (after pressing enter)
     last_player_to_answer: PlayerInfo = None
     used_words: Set[str] = field(default_factory=lambda: set())
+    guess_correct: bool = False
 
     def to_json(self):
         return {
@@ -193,17 +195,13 @@ words_server_state = ServerState()
 
 
 async def wrong_guess(W: ServerState, player: PlayerInfo):
-    if player.lives_left > 0:
-        player.lives_left -= 1
-    await notify_of_su(W, "players")
+    await ws_send_to_all(W, { "type": SWMSG.WrongGuess, "id": player.id })
 
 
-async def correct_guess(W: ServerState, player: PlayerInfo):
+async def correct_guess(W: ServerState, player: PlayerInfo, guess: str):
     gs = W.game_state
-    gs.used_words.add(gs.guess)
-    gs.guess = ""
+    gs.used_words.add(guess)
     player.input = ""
-    await notify_of_su(W, "guess", "players")
 
 
 PlayersById = Dict[PlayerId, PlayerInfo]
@@ -233,7 +231,8 @@ async def end_game(W: ServerState):
     winner = gs.last_player_to_answer
     gs.players = {}
     gs.last_player_to_answer = None
-    await ws_send_to_all(W, {"type": SWMSG.EndGame, "winner": asdict(winner)})
+    if winner is not None:
+        await ws_send_to_all(W, {"type": SWMSG.EndGame, "winner": asdict(winner)})
 
 
 def particles_dict_for(W: ServerState, diff: Difficulty):
@@ -358,17 +357,14 @@ async def start_game(W: ServerState):
         gs.particle = particle
         await notify_of_su(W, "whos_turn", "particle", "players")
         while True:
-            is_correct = is_guess_correct(W, gs.guess)
-            # logger.debug(f"Guess: {gs.guess}, correct: {is_correct}")
-            if is_correct:
-                logger.debug("Correct guess!!")
-                await correct_guess(W, player)
+            if gs.guess_correct:
+                gs.guess_correct = False
                 break
             curr_time = datetime.now()
             out_of_time = curr_time >= time_end
             if out_of_time:
-                logger.debug("Time ran out")
-                await wrong_guess(W, player)
+                if player.lives_left > 0:
+                    player.lives_left -= 1
                 break
             await asyncio.sleep(TICK_DURATION)
     # Game ended
@@ -445,7 +441,14 @@ async def on_player_submit(W: ServerState, gs: GameState, si: ClientInfo, parsed
     if si.id != gs.whos_turn:
         logger.warning(f"Player #{si.id} tried to submit guess during #{gs.whos_turn} player's turn")
         return
-    gs.guess = parsed["guess"]
+    player = gs.players[si.id]
+    guess = parsed["guess"]
+    gs.guess_correct = is_guess_correct(W, guess)
+    if gs.guess_correct:
+        logger.debug(f"Correct guess: {guess}")
+        await correct_guess(W, player, guess)
+    else:
+        await wrong_guess(W, player)
 
 
 ws_handlers_mapping = {

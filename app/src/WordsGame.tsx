@@ -27,6 +27,7 @@ enum SWMSG {
   UserInput = 4,
   PlayerJoined = 5,
   RemovePlayer = 6,
+  WrongGuess = 7,
 }
 
 type PlayerId = number;
@@ -317,6 +318,7 @@ const PlayingScreen = (props: GameTableProps & { socket: WSocket<CWMSG> }) => {
     setUserInput(e.target.value);
   };
   const submitGuess = () => {
+    if (userInput.trim().length <= 0) return;
     socket.send(CWMSG.SubmitGuess, { guess: userInput });
     setUserInput("");
   };
@@ -346,7 +348,12 @@ const PlayingScreen = (props: GameTableProps & { socket: WSocket<CWMSG> }) => {
         <GameTable {...props} C={C} />
         {myTurn && (
           <Input
+            className={cn({
+              "user-input": true,
+              "user-input_wrong": myTurn && C.get("wrongGuess"),
+            })}
             value={userInput}
+            placeholder={t("user-input-answer")}
             inputRef={myInputRef}
             onChange={updateInput}
             onKeyDown={(e) => {
@@ -432,6 +439,7 @@ type ClientState = ImmutableMap<{
   gameState: GameState;
   myId: PlayerId | null;
   winner: PlayerInfo | null;
+  wrongGuess: boolean;
 }>;
 
 const initialClientState: ClientState = Map({
@@ -439,6 +447,7 @@ const initialClientState: ClientState = Map({
   gameState: emptyGameState(),
   myId: null,
   winner: null,
+  wrongGuess: false,
 });
 
 const serverMessageReducer = (state: ClientState, msg: ServerMessage): ClientState => {
@@ -482,6 +491,11 @@ const serverMessageReducer = (state: ClientState, msg: ServerMessage): ClientSta
     case SWMSG.UserInput:
       {
         return state!.setIn(["gameState", "players", parsed.id.toString(), "input"], parsed.input);
+      }
+      break;
+    case SWMSG.WrongGuess:
+      {
+        return state.set("wrongGuess", true);
       }
       break;
     case SWMSG.EndGame:
