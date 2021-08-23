@@ -65,7 +65,8 @@ def load_dictionary(words_dict_path: str, particles_path: str) -> WordGameDict:
     logger.info("Loading dictionary...")
     with open(words_dict_path, "r", encoding="utf-8") as f:
         for word in f.readlines():
-            w = word[:-1]  # don't include the newline
+            # don't include the newline
+            w = word[:-1].lower()
             ww.words.add(w)
     with open(particles_path, "r", encoding="utf-8") as f:
         ww.particles = json.load(f)
