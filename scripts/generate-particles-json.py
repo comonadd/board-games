@@ -2,12 +2,7 @@ import os
 import json
 import argparse
 from collections import Counter, defaultdict
-
-ALLOWED_CHARS = set()
-for i in range(ord("а"), ord("я")):
-    ALLOWED_CHARS.add(chr(i))
-for i in range(ord("А"), ord("Я")):
-    ALLOWED_CHARS.add(chr(i))
+from util import ALLOWED_CHARS
 
 def generate_from_dictionary(dicp: str, encoding: str, freq: Counter, particle_len: int):
     with open(dicp, "r", encoding=encoding) as f:
