@@ -19,6 +19,7 @@ import { Screen, ScreenContent, ScreenContentHeader } from "./Screen";
 import { MIN_PLAYERS_FOR_GAME, WS_WORDS_API_URL } from "./constants";
 import { t, tfmt } from "./ln";
 import ErrorOutlineIcon from '@material-ui/icons/ErrorOutline';
+import Immutable, { Map, List } from "immutable";
 
 enum CWMSG {
   Joining = 0,
@@ -31,15 +32,12 @@ enum SWMSG {
   UpdateGameState = 1,
   EndGame = 2,
   GameInProgress = 3,
+  UserInput = 4,
+  PlayerJoined = 5,
+  RemovePlayer = 6,
 }
 
 type PlayerId = number;
-interface PlayerInfo {
-  nickname: string;
-  lives_left: number;
-  input: string;
-  id: PlayerId;
-}
 
 enum GameStateDesc {
   WaitingForPlayers = 0,
@@ -47,14 +45,27 @@ enum GameStateDesc {
   Starting = 2,
 }
 
-interface GameState {
-  players: Record<PlayerId, PlayerInfo>;
+interface ImmutableMap<T> extends Map<string, any> {
+  get<K extends keyof T>(name: K): T[K];
+}
+
+type PlayerInfo = ImmutableMap<{
+  nickname: string;
+  lives_left: number;
+  input: string;
+  id: PlayerId;
+}>;
+
+type PlayerInfoById = Map<PlayerId, PlayerInfo>;
+
+type GameState = ImmutableMap<{
+  players: PlayerInfoById;
   whos_turn: PlayerId;
   start_timer: number;
   particle: string | null;
   desc: GameStateDesc;
   last_player_to_answer: PlayerId | null;
-}
+}>;
 
 enum WordsGameStep {
   Initial = 0,
@@ -121,7 +132,7 @@ interface OtherTablePlayerProps {
 }
 const TablePlayer = (props: OtherTablePlayerProps) => {
   const { myId, player, playerTurn, gameState } = props;
-  const dead = player.lives_left === 0;
+  const dead = player.get("lives_left") === 0;
   return (
     <div
       className={cn({
@@ -131,29 +142,28 @@ const TablePlayer = (props: OtherTablePlayerProps) => {
       })}
     >
       <div className="player-nickname">
-        {player.nickname} {player.id === myId && <span className="ml-1">({t("you")})</span>}
+        {player.get("nickname")} {player.get("id") === myId && <span className="ml-1">({t("you")})</span>}
       </div>
-      <PlayerHearts n={player.lives_left} />
-      <div className="player-input">{player.input}</div>
+      <PlayerHearts n={player.get("lives_left")} />
+      <div className="player-input">{player.get("input")}</div>
     </div>
   );
 };
 
 interface GameEndedScreenProps {
   myId: PlayerId;
-  winner: PlayerId | null;
+  winner: PlayerInfo;
   join: () => void;
   gameState: GameState;
 }
 
 const GameEndedScreen = ({ myId, join, gameState, winner }: GameEndedScreenProps) => {
-  const winnerPlayer = gameState["players"][winner!];
   return (
     <Screen title="Game Ended">
       <ScreenContent className="flex flex-col game-ended-message flex flex-c">
         <div className="mb-4">
           <Typography component="h1" variant="h5">
-            {winner! === myId ? t("game-ended-me") : tfmt("game-ended", winnerPlayer.nickname)}
+            {winner.id === myId ? t("game-ended-me") : tfmt("game-ended", winner.get("nickname"))}
           </Typography>
         </div>
         <Button onClick={join} color="primary" variant="contained" size="large" className="ph-16">
@@ -173,35 +183,35 @@ interface GameTableProps {
 }
 
 const GameTable = ({ gameState, socket, myId }: GameTableProps) => {
-  const angle = 360 / Object.keys(gameState?.players).length;
+  const angle = 360 / gameState.get("players").size;
   const circleSize = 300;
-
-  const players = Object.values(gameState?.players);
+  const playersById = gameState.get("players");
+  const players: List<PlayerInfo> = playersById ? List(playersById.values()) : List();
   const playerIdxById = players.reduce((acc: Record<PlayerId, number>, p, idx) => {
-    acc[p.id] = idx;
+    acc[p.get("id")] = idx;
     return acc;
   }, {});
   const renderedPlayers = useMemo(() => {
-    if (players.length === 0) return <div>No players joined yet</div>;
-    if (players.length === 1) {
-      const pid = players[0].id;
+    if (players.size === 0) return <div>No players joined yet</div>;
+    if (players.size === 1) {
+      const pid = players.get(0)!.get("id");
       return (
         <Paper elevation={1} key={pid} className="player-slot">
           <TablePlayer
             gameState={gameState}
-            player={players[0]}
-            playerTurn={gameState.whos_turn === pid}
+            player={players.get(0)!}
+            playerTurn={gameState.get("whos_turn") === pid}
             myId={myId}
           />
         </Paper>
       );
     }
-    return players.map((player, idx) => {
-      const pid = player.id;
+    return players.map((player: PlayerInfo, idx) => {
+      const pid = player.get("id");
       const p = {
         gameState,
         player,
-        playerTurn: gameState.whos_turn === pid,
+        playerTurn: gameState.get("whos_turn") === pid,
       };
       // Calculate table position
       const rot = idx * angle;
@@ -217,14 +227,15 @@ const GameTable = ({ gameState, socket, myId }: GameTableProps) => {
   }, [gameState, myId]);
 
   const renderedArrow = useMemo(() => {
+    const t = gameState.get("whos_turn");
     if (
-      gameState.whos_turn === undefined ||
-      gameState.whos_turn === null ||
-      gameState.whos_turn === -1
+      t === undefined ||
+      t === null ||
+      t === -1
     ) {
       return null;
     }
-    const rot = playerIdxById[gameState.whos_turn as any] * angle;
+    const rot = playerIdxById[gameState.get("whos_turn") as any] * angle;
     const style = {
       transform: `rotate(${rot}deg)`,
     };
@@ -237,13 +248,13 @@ const GameTable = ({ gameState, socket, myId }: GameTableProps) => {
         />
       </div>
     );
-  }, [gameState.whos_turn]);
+  }, [gameState.get("whos_turn")]);
 
   return (
     <div className="player-table">
       <div className="player-table-center">
-        {gameState.particle && (
-          <div className="particle-to-guess">{gameState.particle.toUpperCase()}</div>
+        {gameState.get("particle") && (
+          <div className="particle-to-guess">{gameState.get("particle")!.toUpperCase()}</div>
         )}
         {renderedArrow}
         {renderedPlayers}
@@ -253,7 +264,7 @@ const GameTable = ({ gameState, socket, myId }: GameTableProps) => {
 };
 
 const StartingScreen = (props: GameTableProps) => {
-  const ts = tfmt("starting", props.gameState.start_timer);
+  const ts = tfmt("starting", props.gameState.get("start_timer"));
   return (
     <Screen title={ts}>
       <ScreenContent>
@@ -270,7 +281,7 @@ const WaitingForPlayersScreen = (props: GameTableProps) => {
     <Screen title={t("waiting-players")}>
       <ScreenContent>
         <ScreenContentHeader
-          title={tfmt("waiting-players", Object.keys(gs.players).length, MIN_PLAYERS_FOR_GAME)}
+          title={tfmt("waiting-players", gs.get("players").size, MIN_PLAYERS_FOR_GAME)}
         />
         <GameTable {...props} />
       </ScreenContent>
@@ -297,7 +308,7 @@ const ConnectingScreen = () => {
 const PlayingScreen = (props: GameTableProps & { socket: WSocket<CWMSG>; myId: PlayerId }) => {
   const { gameState, socket, myId } = props;
   // Input
-  const myTurn = gameState?.whos_turn === myId;
+  const myTurn = gameState.get("whos_turn") === myId;
   const [userInput, setUserInput] = useState<string>("");
   const updateInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUserInput(e.target.value);
@@ -350,14 +361,13 @@ const PlayingScreen = (props: GameTableProps & { socket: WSocket<CWMSG>; myId: P
 const ErrorGameInProgressScreen = (props: { tryAgain: () => void }) => {
   const { tryAgain } = props;
   return (
-    <Screen title={t("game-in-progress")}>
-      <ScreenContent className="flex flex-c">
-        <div>
-          <Button onClick={tryAgain} variant="contained" color="primary">
-            {t("try-again")}
-          </Button>
-        </div>
-      </ScreenContent>
+    <Screen title={t("in-game")}>
+      <Paper elevation={1} className="screen-msg">
+        <div className="mb-4">{t("in-game")}</div>
+        <Button onClick={tryAgain} variant="contained" color="primary">
+          {t("try-again")}
+        </Button>
+      </Paper>
     </Screen>
   );
 };
@@ -391,13 +401,13 @@ const GameScreen = (props: {
   if (gameState === null) return <div>Loading...</div>;
   return (
     <>
-      {gameState.desc === GameStateDesc.WaitingForPlayers && (
+      {gameState.get("desc") === GameStateDesc.WaitingForPlayers && (
         <WaitingForPlayersScreen {...props} gameState={gameState!} />
       )}
-      {gameState.desc === GameStateDesc.Starting && (
+      {gameState.get("desc") === GameStateDesc.Starting && (
         <StartingScreen {...props} gameState={gameState} />
       )}
-      {gameState.desc === GameStateDesc.Playing && (
+      {gameState.get("desc") === GameStateDesc.Playing && (
         <PlayingScreen {...props} gameState={gameState!} />
       )}
     </>
@@ -411,7 +421,7 @@ const WordsGame = () => {
   const [userGuess, setState] = useState<string>("");
   const [myId, setMyId] = useState<PlayerId>(-1);
   const resetState = () => setGameState(emptyGameState());
-  const [winner, setWinner] = useState<PlayerId | null>(null);
+  const [winner, setWinner] = useState<PlayerInfo | null>(null);
   const socket = useWSocket<CWMSG, ClientMessage, ServerMessage>(
     WS_WORDS_API_URL,
     (messageHistory: ServerMessage[]) => {
@@ -422,20 +432,39 @@ const WordsGame = () => {
           case SWMSG.InitGame:
             {
               setStep(WordsGameStep.Playing);
-              setGameState(parsed.state);
+              const initial = Map(Immutable.fromJS(parsed.state) as any);
+              setGameState(initial);
               setMyId(parsed.player.id);
             }
             break;
           case SWMSG.UpdateGameState:
             {
-              const newState = parsed.state;
-              setGameState({ ...gameState, ...newState });
+              const newState = gameState!.merge(Map(Immutable.fromJS(parsed.state) as any) as any);
+              setGameState(newState);
+            }
+            break;
+          case SWMSG.PlayerJoined:
+            {
+              const nextState = gameState!.updateIn(["players"], (players: PlayerInfoById) =>
+                players.set(parsed.player.id, Map(parsed.player)));
+              setGameState(nextState);
+            }
+            break;
+          case SWMSG.RemovePlayer:
+            {
+              const nextState = gameState!.updateIn(["players"], (players: PlayerInfoById) => players.remove(parsed.id));
+              setGameState(nextState);
+            }
+            break;
+          case SWMSG.UserInput:
+            {
+              setGameState(gameState!.setIn(["players", parsed.id.toString(), "input"], parsed.input));
             }
             break;
           case SWMSG.EndGame:
             {
               setStep(WordsGameStep.Ended);
-              setWinner(parsed.winner);
+              setWinner(Map(parsed.winner));
             }
             break;
           case SWMSG.GameInProgress:

@@ -258,7 +258,7 @@ html, body {
 }
 
 .player.player_turn {
-  background: green;
+  /* background: green; */
 }
 
 .player.player_dead {
@@ -305,7 +305,7 @@ html, body {
 .player-input {
   width: 100%;
   font-size: 16px;
-  font-weight: bold;
+  /* font-weight: bold; */
   color: grey;
 }
 
@@ -314,6 +314,7 @@ html, body {
   width: auto;
   display: flex;
   justify-content: center;
+  color: red;
 }
 
 .player-nickname {
