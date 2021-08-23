@@ -6,6 +6,7 @@ import Button from "@material-ui/core/Button";
 import Typography from "@material-ui/core/Typography";
 import FavoriteIcon from "@material-ui/icons/Favorite";
 import ArrowRightAltIcon from "@material-ui/icons/ArrowRightAlt";
+import Grid from "@material-ui/core/Grid";
 import { generateInitialNickname, cn, WSocketState, WSocket, useWSocket } from "./util";
 import { Screen, ScreenContent, ScreenContentHeader } from "./Screen";
 import { MIN_PLAYERS_FOR_GAME, WS_WORDS_API_URL } from "./constants";
@@ -30,7 +31,7 @@ enum SWMSG {
   WrongGuess = 7,
 }
 
-type PlayerId = number;
+type PlayerId = string;
 
 enum GameStateDesc {
   WaitingForPlayers = 0,
@@ -47,6 +48,7 @@ type PlayerInfo = ImmutableMap<{
   lives_left: number;
   input: string;
   id: PlayerId;
+  letters_left: number[];
 }>;
 
 type PlayerInfoById = Map<PlayerId, PlayerInfo>;
@@ -58,6 +60,7 @@ type GameState = ImmutableMap<{
   particle: string | null;
   desc: GameStateDesc;
   last_player_to_answer: PlayerId | null;
+  all_letters: number[];
 }>;
 
 enum WordsGameStep {
@@ -341,6 +344,29 @@ const PlayingScreen = (props: GameTableProps & { socket: WSocket<CWMSG> }) => {
     myInputRef.current.focus();
   }, [myTurn]);
 
+  const playersById = gameState.get("players");
+  const myPlayer = playersById.get(myId);
+  const lettersLeftList = myPlayer.get("letters_left");
+  const usedLettersTable = useMemo(() => {
+    let allLetters = gameState.get("all_letters");
+    const lettersLeft = new Set(lettersLeftList);
+    return (
+      <div className="wletter-table">
+        {allLetters.map((letter: number) => {
+          const ch = String.fromCharCode(letter);
+          return (
+            <Paper
+              elevation={1}
+              className={cn({ wletter: true, wletter_used: !lettersLeft.has(letter) })}
+            >
+              {ch}
+            </Paper>
+          );
+        })}
+      </div>
+    );
+  }, [lettersLeftList]);
+
   return (
     <Screen title="Playing">
       <ScreenContent>
@@ -364,6 +390,7 @@ const PlayingScreen = (props: GameTableProps & { socket: WSocket<CWMSG> }) => {
           />
         )}
       </ScreenContent>
+      {usedLettersTable}
     </Screen>
   );
 };
@@ -460,7 +487,7 @@ const serverMessageReducer = (state: ClientState, msg: ServerMessage): ClientSta
         console.log("asdfasdfasdf");
         state = state.set("step", WordsGameStep.Playing);
         state = state.set("gameState", Map(Immutable.fromJS(parsed.state) as any));
-        state = state.set("myId", parsed.player.id);
+        state = state.set("myId", String(parsed.player.id));
         return state;
       }
       break;
@@ -524,7 +551,7 @@ const gameStateReducer = (state: ClientState, action: ClientAction): ClientState
   console.group("reducer dispatch");
   console.log(action);
   console.log(state);
-  console.groupEnd("reducer dispatch");
+  console.groupEnd();
   const parsed = action;
   switch (action.type) {
     case ActionType.ServerMessage:

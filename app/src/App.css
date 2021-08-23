@@ -1,3 +1,7 @@
+:root {
+  --wletter-size: 50px;
+}
+
 * {
   outline: none;
   box-sizing: border-box;
@@ -58,10 +62,10 @@ html, body {
   display: flex;
   justify-content: center;
   align-items: center;
-  /* height: 100%; */
   flex-direction: column;
   background: #eee;
   padding: 24px;
+  position: relative;
 }
 
 .screen-content {
@@ -312,6 +316,37 @@ html, body {
 
 .user-input.user-input_wrong {
   color: red;
+}
+
+.wletter-table {
+  display: grid;
+  width: 100%;
+  overflow: hidden;
+  height: 100%;
+  overflow-y: auto;
+  grid-template-columns: 1fr 1fr 1fr;
+  column-gap: 6px;
+  row-gap: 6px;
+  padding: 8px;
+  width: 100%;
+  position: absolute;
+  width: auto;
+  right: 0;
+  top: 0;
+  height: auto;
+}
+
+.wletter {
+  width: var(--wletter-size);
+  height: var(--wletter-size);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.wletter.wletter_used {
+  background: #838383;
+  color: white;
 }
 
 .player-hearts {

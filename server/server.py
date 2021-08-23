@@ -36,11 +36,11 @@ def configure_loggers():
 
 
 # Settings
-TIME_UNTIL_START = 2
-LIVES_INITIAL = 2
+TIME_UNTIL_START = 3
+LIVES_INITIAL = 3
 MIN_PLAYERS_TO_START_GAME = 2
 TICK_DURATION = 0.05
-TIME_TO_ANSWER = 40
+TIME_TO_ANSWER = 60
 WORDS_DICT_PATH = "./assets/words.txt"
 PARTICLES_PATH = "./assets/particles.json"
 MIN_PARTICLE_LENGTH = 3
@@ -105,8 +105,14 @@ class GameStateDesc:
 
 
 Message = Dict
-PlayerId = int
+PlayerId = str
 
+
+def player_letters_left_initial() -> Set[int]:
+    l = set()
+    for i in range(ord("а"), ord("я") + 1):
+        l.add(i)
+    return l
 
 @dataclass
 class PlayerInfo:
@@ -115,13 +121,20 @@ class PlayerInfo:
     lives_left: int = LIVES_INITIAL
     nickname: str = None
     input: str = ""
+    letters_left: Set[int] = field(default_factory=player_letters_left_initial)
+
+    def to_json(self):
+        return {
+            **asdict(self),
+            "letters_left": list(self.letters_left),
+        }
 
 
 @dataclass
 class GameState:
     """ Current game state. Shared between client and server. """
     players: Dict[PlayerId, PlayerInfo] = field(default_factory=lambda: {})
-    whos_turn: int = -1
+    whos_turn: PlayerId = -1
     particle: str = None
     desc: GameStateDesc = GameStateDesc.WaitingForPlayers
     start_timer: int = -1
@@ -129,10 +142,14 @@ class GameState:
     last_player_to_answer: PlayerInfo = None
     used_words: Set[str] = field(default_factory=lambda: set())
     guess_correct: bool = False
+    all_letters: List[str] = field(default_factory=player_letters_left_initial)
 
     def to_json(self):
+        players_json = { pid: p.to_json() for pid, p in self.players.items() }
         return {
             **asdict(self),
+            "all_letters": list(self.all_letters),
+            "players": players_json,
             "used_words": list(self.used_words),
         }
 
@@ -173,7 +190,7 @@ async def ws_send_to_others(W: ServerState, si: ClientInfo, msg: Message):
 
 def state_update_msg(W: ServerState, *keys):
     gs = W.game_state
-    gsd = asdict(gs)
+    gsd = gs.to_json()
     msg = {
         "type": SWMSG.UpdateGameState,
         "state": {key: gsd[key] for key in keys}
@@ -202,23 +219,18 @@ async def correct_guess(W: ServerState, player: PlayerInfo, guess: str):
     gs = W.game_state
     gs.used_words.add(guess)
     player.input = ""
+    # use all letters in the word
+    for letter in guess:
+        k = ord(letter.lower())
+        if k in player.letters_left:
+            player.letters_left.remove(k)
+    logger.debug(f"player={player.nickname}, letters_left={' '.join(list(map(lambda x: chr(x), player.letters_left)))}")
+    if len(player.letters_left) == 0:
+        player.lives_left += 1
+        player.letters_left = player_letters_left_initial()
 
 
 PlayersById = Dict[PlayerId, PlayerInfo]
-
-
-class AlivePlayerIterator:
-    alive: PlayersById
-
-    def __init__(players: PlayersById):
-        self.alive = players
-
-    def __next__(self):
-        res = next(self.alive)
-        return res
-
-    def __iter__(self):
-        return self
 
 
 async def end_game(W: ServerState):
@@ -232,7 +244,7 @@ async def end_game(W: ServerState):
     gs.players = {}
     gs.last_player_to_answer = None
     if winner is not None:
-        await ws_send_to_all(W, {"type": SWMSG.EndGame, "winner": asdict(winner)})
+        await ws_send_to_all(W, {"type": SWMSG.EndGame, "winner": winner.to_json()})
 
 
 def particles_dict_for(W: ServerState, diff: Difficulty):
@@ -340,35 +352,38 @@ async def start_game(W: ServerState):
     alive_players = init_alive_players_list(gs.players)
     pit = players_list_iter(alive_players)
 
-    while gs.desc == GameStateDesc.Playing:
-        # Process current turn
-        try:
-            player = next(pit)
-        except StopIteration:
-            break
-        player_id = player.id
-        gs.last_player_to_answer = player
-        player.input = ""
-        logger.debug("Processing player {}".format(player.nickname))
-        particle = random.choice(pdict)
-        # logger.debug("Guessing {}".format(correct_guess))
-        time_end = datetime.now() + timedelta(seconds=TIME_TO_ANSWER)
-        gs.whos_turn = player_id
-        gs.particle = particle
-        await notify_of_su(W, "whos_turn", "particle", "players")
-        while True:
-            if gs.guess_correct:
-                gs.guess_correct = False
+    try:
+        while gs.desc == GameStateDesc.Playing:
+            # Process current turn
+            try:
+                player = next(pit)
+            except StopIteration:
                 break
-            curr_time = datetime.now()
-            out_of_time = curr_time >= time_end
-            if out_of_time:
-                if player.lives_left > 0:
-                    player.lives_left -= 1
-                break
-            await asyncio.sleep(TICK_DURATION)
-    # Game ended
-    await end_game(W)
+            player_id = player.id
+            gs.last_player_to_answer = player
+            player.input = ""
+            logger.debug("Processing player {}".format(player.nickname))
+            particle = random.choice(pdict)
+            # logger.debug("Guessing {}".format(correct_guess))
+            time_end = datetime.now() + timedelta(seconds=TIME_TO_ANSWER)
+            gs.whos_turn = player_id
+            gs.particle = particle
+            await notify_of_su(W, "whos_turn", "particle", "players")
+            while True:
+                if gs.guess_correct:
+                    gs.guess_correct = False
+                    break
+                curr_time = datetime.now()
+                out_of_time = curr_time >= time_end
+                if out_of_time:
+                    if player.lives_left > 0:
+                        player.lives_left -= 1
+                    break
+                await asyncio.sleep(TICK_DURATION)
+        # Game ended
+        await end_game(W)
+    except Exception as e:
+        logger.error(f"Error during start_game() loop: {e.__repr__()}")
 
 
 async def reset_game(W: ServerState):
@@ -411,8 +426,8 @@ async def on_player_joined(W: ServerState, gs: GameState, si: ClientInfo, parsed
     )
     gs.players[ws_id] = new_player
     await send_to_user(
-        si, {"type": SWMSG.InitGame, "state": gs.to_json(), "player": asdict(new_player)})
-    await ws_send_to_others(W, si, {"type": SWMSG.PlayerJoined, "player": asdict(new_player)})
+        si, {"type": SWMSG.InitGame, "state": gs.to_json(), "player": new_player.to_json()})
+    await ws_send_to_others(W, si, {"type": SWMSG.PlayerJoined, "player": new_player.to_json()})
 
     # If we're waiting for players and we have enough players, start the game
     if waiting_for_players(gs) and len(gs.players) >= MIN_PLAYERS_TO_START_GAME:
@@ -430,8 +445,6 @@ async def on_player_input(W: ServerState, gs: GameState, si: ClientInfo, parsed:
         logger.warning(f"Player #{si.id} tried to update input during #{gs.whos_turn} player's turn")
         return
     player = gs.players[si.id]
-    logger.debug("processing player input:")
-    logger.debug(player)
     player.input = parsed["input"]
     await ws_send_to_all(W, {"type": SWMSG.UserInput, "id": player.id, "input": player.input})
 
@@ -464,7 +477,7 @@ __player_id = 0
 def next_player_id():
     global __player_id
     __player_id += 1
-    return __player_id
+    return str(__player_id)
 
 
 def get_player(W: ServerState, pid: PlayerId) -> PlayerInfo:
@@ -492,7 +505,8 @@ async def remove_player(W: ServerState, si: ClientInfo):
         await ws_send_to_others(W, si, {"type": SWMSG.RemovePlayer, "id": pid})
         if len(gs.players) < MIN_PLAYERS_TO_START_GAME:
             await end_game(W)
-            W.game_handle.cancel()
+            if W.game_handle is not None:
+                W.game_handle.cancel()
 
 
 def is_user_connected(W: ServerState, pid: PlayerId):
@@ -532,8 +546,6 @@ async def words_game(request):
                 continue
             if msg.type == aiohttp.WSMsgType.TEXT:
                 parsed = json.loads(msg.data)
-                logger.debug("GOT MESSAGE FROM CLIENT")
-                logger.debug(parsed)
                 _type = parsed["type"]
                 f = ws_handlers_mapping.get(_type, None)
                 if f is None:
