@@ -310,8 +310,10 @@ const ConnectingScreen = () => {
   );
 };
 
-const PlayingScreen = (props: GameTableProps & { socket: WSocket<CWMSG> }) => {
-  const { C, socket } = props;
+type Dispatch = (a: ClientAction) => void;
+
+const PlayingScreen = (props: GameTableProps & { dispatch: Dispatch; socket: WSocket<CWMSG> }) => {
+  const { dispatch, C, socket } = props;
   const gameState = C.get("gameState");
   const myId = C.get("myId");
   // Input
@@ -334,7 +336,10 @@ const PlayingScreen = (props: GameTableProps & { socket: WSocket<CWMSG> }) => {
   // Auto-focus on current player's turn
   const myInputRef = useRef<any>(null);
   useEffect(() => {
-    if (!myTurn) return;
+    if (!myTurn) {
+      dispatch({ type: ActionType.ResetWrongGuess });
+      return;
+    }
     // Reset user input before each turn, then focus on it
     setUserInput("");
     if (myInputRef.current === null) {
@@ -434,7 +439,12 @@ const FailedToConnectScreen = (props: { retry: () => void }) => {
   );
 };
 
-const GameScreen = (props: { socket: WSocket<CWMSG>; join: () => void; C: ClientState }) => {
+const GameScreen = (props: {
+  dispatch: Dispatch;
+  socket: WSocket<CWMSG>;
+  join: () => void;
+  C: ClientState;
+}) => {
   const { C, join, socket } = props;
   const myId = C.get("myId");
   const gameState = C.get("gameState");
@@ -454,6 +464,7 @@ enum ActionType {
   ServerMessage = 0,
   ResetState = 1,
   SetStep = 2,
+  ResetWrongGuess = 3,
 }
 
 interface ClientAction {
@@ -569,6 +580,11 @@ const gameStateReducer = (state: ClientState, action: ClientAction): ClientState
         return state.set("step", action.payload);
       }
       break;
+    case ActionType.ResetWrongGuess:
+      {
+        return state.set("wrongGuess", false);
+      }
+      break;
     default:
       {
         console.warn("Unknown action");
@@ -653,7 +669,7 @@ const WordsGame = () => {
         break;
       case WordsGameStep.Playing:
         {
-          return <GameScreen socket={socket} C={C} join={join} />;
+          return <GameScreen dispatch={dispatch} socket={socket} C={C} join={join} />;
         }
         break;
       case WordsGameStep.Ended:

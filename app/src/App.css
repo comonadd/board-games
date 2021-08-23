@@ -342,10 +342,11 @@ html, body {
   display: flex;
   justify-content: center;
   align-items: center;
+  transition: background-color 0.2s ease-in, color 0.2s ease-in !important;
 }
 
 .wletter.wletter_used {
-  background: #838383;
+  background-color: #838383;
   color: white;
 }
 
