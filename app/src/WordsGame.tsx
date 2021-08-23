@@ -14,6 +14,8 @@ import { t, tfmt } from "./ln";
 import ErrorOutlineIcon from "@material-ui/icons/ErrorOutline";
 import Immutable, { Map, List } from "immutable";
 
+const displayActionLog = false;
+
 enum CWMSG {
   Joining = 0,
   UpdateInput = 1,
@@ -136,6 +138,8 @@ const TablePlayer = (props: OtherTablePlayerProps) => {
   const { C, player, playerTurn } = props;
   const myId = C.get("myId");
   const dead = player.get("lives_left") === 0;
+  const input = player.get("input");
+  const nick = `${player.get("nickname")} (${t("you")})`;
   return (
     <div
       className={cn({
@@ -144,12 +148,9 @@ const TablePlayer = (props: OtherTablePlayerProps) => {
         player_turn: playerTurn,
       })}
     >
-      <div className="player-nickname">
-        {player.get("nickname")}{" "}
-        {player.get("id") === myId && <span className="ml-1">({t("you")})</span>}
-      </div>
+      <div className="player-nickname">{nick}</div>
       <PlayerHearts n={player.get("lives_left")} />
-      <div className="player-input">{player.get("input")}</div>
+      {input && <div className="player-input mt-2">{input}</div>}
     </div>
   );
 };
@@ -236,7 +237,7 @@ const GameTable = ({ C, socket }: GameTableProps) => {
 
   const renderedArrow = useMemo(() => {
     const t = gameState.get("whos_turn");
-    if (t === undefined || t === null || t === -1) {
+    if (t === undefined || t === null) {
       return null;
     }
     const rot = playerIdxById[gameState.get("whos_turn") as any] * angle;
@@ -316,6 +317,7 @@ const PlayingScreen = (props: GameTableProps & { dispatch: Dispatch; socket: WSo
   const { dispatch, C, socket } = props;
   const gameState = C.get("gameState");
   const myId = C.get("myId");
+
   // Input
   const myTurn = gameState.get("whos_turn") === myId;
   const [userInput, setUserInput] = useState<string>("");
@@ -349,9 +351,9 @@ const PlayingScreen = (props: GameTableProps & { dispatch: Dispatch; socket: WSo
     myInputRef.current.focus();
   }, [myTurn]);
 
-  const playersById = gameState.get("players");
-  const myPlayer = playersById.get(myId);
-  const lettersLeftList = myPlayer.get("letters_left");
+  const playersById = gameState.get("players")!;
+  const myPlayer = myId ? playersById.get(myId)! : null;
+  const lettersLeftList = myPlayer !== null ? myPlayer.get("letters_left") : [];
   const usedLettersTable = useMemo(() => {
     let allLetters = gameState.get("all_letters");
     const lettersLeft = new Set(lettersLeftList);
@@ -361,6 +363,7 @@ const PlayingScreen = (props: GameTableProps & { dispatch: Dispatch; socket: WSo
           const ch = String.fromCharCode(letter);
           return (
             <Paper
+              key={letter}
               elevation={1}
               className={cn({ wletter: true, wletter_used: !lettersLeft.has(letter) })}
             >
@@ -377,23 +380,22 @@ const PlayingScreen = (props: GameTableProps & { dispatch: Dispatch; socket: WSo
       <ScreenContent>
         <ScreenContentHeader title={t("in-game")} />
         <GameTable {...props} C={C} />
-        {myTurn && (
-          <Input
-            className={cn({
-              "user-input": true,
-              "user-input_wrong": myTurn && C.get("wrongGuess"),
-            })}
-            value={userInput}
-            placeholder={t("user-input-answer")}
-            inputRef={myInputRef}
-            onChange={updateInput}
-            onKeyDown={(e) => {
-              if (e.keyCode === 13) {
-                submitGuess();
-              }
-            }}
-          />
-        )}
+        <Input
+          disabled={!myTurn}
+          className={cn({
+            "user-input": true,
+            "user-input_wrong": myTurn && C.get("wrongGuess"),
+          })}
+          value={userInput}
+          placeholder={t("user-input-answer")}
+          inputRef={myInputRef}
+          onChange={updateInput}
+          onKeyDown={(e) => {
+            if (e.keyCode === 13) {
+              submitGuess();
+            }
+          }}
+        />
       </ScreenContent>
       {usedLettersTable}
     </Screen>
@@ -490,12 +492,10 @@ const initialClientState: ClientState = Map({
 
 const serverMessageReducer = (state: ClientState, msg: ServerMessage): ClientState => {
   const parsed = msg;
-  console.log(parsed);
   switch (parsed.type) {
     // We get this after joining with a nickname
     case SWMSG.InitGame:
       {
-        console.log("asdfasdfasdf");
         state = state.set("step", WordsGameStep.Playing);
         state = state.set("gameState", Map(Immutable.fromJS(parsed.state) as any));
         state = state.set("myId", String(parsed.player.id));
@@ -505,14 +505,14 @@ const serverMessageReducer = (state: ClientState, msg: ServerMessage): ClientSta
     case SWMSG.UpdateGameState:
       {
         // Generic game state update
-        return state.updateIn(["gameState"], (gs: GameState) =>
+        return state.updateIn(["gameState"], (gs: any) =>
           gs.merge(Map(Immutable.fromJS(parsed.state) as any) as any),
         );
       }
       break;
     case SWMSG.PlayerJoined:
       {
-        const nextState = state.updateIn(["gameState", "players"], (players: PlayerInfoById) =>
+        const nextState = state.updateIn(["gameState", "players"], (players: any) =>
           players.set(parsed.player.id, Map(parsed.player)),
         );
         return nextState;
@@ -520,7 +520,7 @@ const serverMessageReducer = (state: ClientState, msg: ServerMessage): ClientSta
       break;
     case SWMSG.RemovePlayer:
       {
-        const nextState = state.updateIn(["gameState", "players"], (players: PlayerInfoById) =>
+        const nextState = state.updateIn(["gameState", "players"], (players: any) =>
           players.remove(parsed.id),
         );
         return nextState;
@@ -559,10 +559,12 @@ const serverMessageReducer = (state: ClientState, msg: ServerMessage): ClientSta
 };
 
 const gameStateReducer = (state: ClientState, action: ClientAction): ClientState => {
-  console.group("reducer dispatch");
-  console.log(action);
-  console.log(state);
-  console.groupEnd();
+  if (displayActionLog) {
+    console.group("reducer dispatch");
+    console.info(action);
+    console.info(state.toJS());
+    console.groupEnd();
+  }
   const parsed = action;
   switch (action.type) {
     case ActionType.ServerMessage:
@@ -626,8 +628,6 @@ const WordsGame = () => {
 
   // Render
   const game = useMemo(() => {
-    console.log("C updated, re-rendering the game");
-    console.log(C.toJS());
     const retry = () => {
       socket.reset();
       resetState();

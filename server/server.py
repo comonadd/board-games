@@ -36,11 +36,11 @@ def configure_loggers():
 
 
 # Settings
-TIME_UNTIL_START = 3
+TIME_UNTIL_START = 10
 LIVES_INITIAL = 3
 MIN_PLAYERS_TO_START_GAME = 2
 TICK_DURATION = 0.05
-TIME_TO_ANSWER = 60
+TIME_TO_ANSWER = 15
 WORDS_DICT_PATH = "./assets/words.txt"
 PARTICLES_PATH = "./assets/particles.json"
 MIN_PARTICLE_LENGTH = 3
@@ -135,7 +135,7 @@ class PlayerInfo:
 class GameState:
     """ Current game state. Shared between client and server. """
     players: Dict[PlayerId, PlayerInfo] = field(default_factory=lambda: {})
-    whos_turn: PlayerId = -1
+    whos_turn: PlayerId = None
     particle: str = None
     desc: GameStateDesc = GameStateDesc.WaitingForPlayers
     start_timer: int = -1
@@ -246,7 +246,7 @@ async def end_game(W: ServerState):
     gs.desc = GameStateDesc.WaitingForPlayers
     # Reset players
     gs.particle = None
-    gs.whos_turn = -1
+    gs.whos_turn = None
     gs.start_timer = -1
     winner = gs.last_player_to_answer
     gs.players = {}
@@ -392,16 +392,6 @@ async def start_game(W: ServerState):
         await end_game(W)
     except Exception as e:
         logger.error(f"Error during start_game() loop: {e.__repr__()}")
-
-
-async def reset_game(W: ServerState):
-    gs = W.game_state
-    gs.desc = GameStateDesc.WaitingForPlayers
-    gs.start_timer = -1
-    gs.players = {}
-    gs.particle = None
-    gs.whos_turn = -1
-    await notify_of_su(W, "desc", "start_timer", "players", "particle", "whos_turn")
 
 
 async def send_to_user(si: ClientInfo, msg: Message):

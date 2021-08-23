@@ -286,11 +286,10 @@ html, body {
 
 .player-slot {
   /* width: 60px; */
-  /* height: 60px; */
+  height: 100px;
   margin: -60px;
   position: absolute;
   width: 200px;
-  height: 80px;
 }
 
 .player-slot > .player {
@@ -304,6 +303,7 @@ html, body {
   justify-content: center;
   align-items: center;
   padding: 16px;
+  height: 100%;
 }
 
 .player-input {
@@ -362,6 +362,8 @@ html, body {
   display: flex;
   white-space: nowrap;
   margin-bottom: 6px;
+  white-space: pre-wrap;
+  text-align: center;
 }
 
 .particle-to-guess {
