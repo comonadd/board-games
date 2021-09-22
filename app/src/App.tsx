@@ -43,7 +43,7 @@ const Header = () => {
 const App = () => {
   return (
     <Localizator>
-      <Router>
+      <Router basename="/quiz-game">
         <div className="app">
           <Header />
           <Switch>
