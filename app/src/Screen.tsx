@@ -18,7 +18,10 @@ export const ScreenContent = (props: { children: any; className?: string }) => {
   );
 };
 
-export const ScreenContentHeader = (props: { title: string; children?: any }) => {
+export const ScreenContentHeader = (props: {
+  title: string;
+  children?: any;
+}) => {
   return (
     <div className="screen-content-header">
       <div className="flex flex-c flex-100">

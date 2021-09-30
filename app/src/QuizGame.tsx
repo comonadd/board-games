@@ -27,10 +27,7 @@ import {
   timerSeconds,
   useMSTimer,
 } from "./util";
-import {
-  THEMES_URL,
-  QUESTIONS_URL,
-} from "./constants";
+import { THEMES_URL, QUESTIONS_URL } from "./constants";
 
 interface Question {
   text: string;
@@ -87,7 +84,10 @@ const useThemes = () => {
 
 const articles = new Set(["the", "an", "a"]);
 
-const doesAnswerMatchQuestion = (question: Question, answer: string): boolean => {
+const doesAnswerMatchQuestion = (
+  question: Question,
+  answer: string
+): boolean => {
   let rightAnswer = question.answer.toLowerCase();
   let userAnswer = answer.toLowerCase();
   const rightAnswerWords = rightAnswer.split(" ");
@@ -136,7 +136,10 @@ const ConfigurationScreen = (props: {
             <Grid item xs={3} key={theme}>
               <Paper
                 elevation={2}
-                className={cn({ "theme-card": true, "theme-card_selected": isSelected })}
+                className={cn({
+                  "theme-card": true,
+                  "theme-card_selected": isSelected,
+                })}
                 onClick={() => {
                   if (!isSelected) {
                     onUpdate({
@@ -158,7 +161,12 @@ const ConfigurationScreen = (props: {
           );
         })}
       </Grid>
-      <Button onClick={props.onPlay} variant="contained" size="large" color="primary">
+      <Button
+        onClick={props.onPlay}
+        variant="contained"
+        size="large"
+        color="primary"
+      >
         Play the game
       </Button>
     </Screen>
@@ -181,13 +189,17 @@ enum Step {
 
 const Play = (props: PlayScreenProps) => {
   const { gameSettings } = props;
-  const { questions, reshuffleQuestions } = useQuestions(gameSettings.themes, true);
+  const { questions, reshuffleQuestions } = useQuestions(
+    gameSettings.themes,
+    true
+  );
   const [currentQuestionIdx, setCurrentQuestionIdx] = useState<number>(-1);
   const currentQuestion: Question | null =
     currentQuestionIdx !== -1 ? questions[currentQuestionIdx] : null;
   const [userAnswer, setUserAnswer] = useState<string>("");
   const [remainingAttempts, setRemainingAttempts] = useState<number>(3);
-  const [properAnsweredQuestions, setProperAnsweredQuestions] = useState<number>(0);
+  const [properAnsweredQuestions, setProperAnsweredQuestions] =
+    useState<number>(0);
   const [totalPonts, setTotalPoints] = useState<number>(0);
   const timer = useMSTimer(1000, TIME_TO_ANSWER_QUESTION, true);
 
@@ -267,7 +279,11 @@ const Play = (props: PlayScreenProps) => {
               </Button>
             </Grid>
             <Grid item xs={12} md={6} className="flex flex-ch">
-              <Button onClick={props.gotoSettings} color="secondary" variant="outlined">
+              <Button
+                onClick={props.gotoSettings}
+                color="secondary"
+                variant="outlined"
+              >
                 Change settings
               </Button>
             </Grid>
@@ -277,7 +293,8 @@ const Play = (props: PlayScreenProps) => {
     );
   }
 
-  const isImageQuestion = currentQuestion !== null && currentQuestion.text[0] === "@";
+  const isImageQuestion =
+    currentQuestion !== null && currentQuestion.text[0] === "@";
 
   return (
     <Screen title="Playing">
@@ -311,7 +328,7 @@ const Play = (props: PlayScreenProps) => {
                 <img
                   src={`/questions/Images/${currentQuestion.text.substr(
                     1,
-                    currentQuestion.text.length,
+                    currentQuestion.text.length
                   )}`}
                   className="mb-2"
                 />
@@ -361,14 +378,17 @@ const QuizGame = () => {
     (v: any) => ({
       themes: new Set(v.themes),
       mode: v.mode,
-    }),
+    })
   );
   const game = (() => {
     switch (step) {
       case Step.Playing:
         {
           return (
-            <Play gameSettings={gameSettings} gotoSettings={() => setStep(Step.ConfiguringGame)} />
+            <Play
+              gameSettings={gameSettings}
+              gotoSettings={() => setStep(Step.ConfiguringGame)}
+            />
           );
         }
         break;

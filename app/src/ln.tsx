@@ -38,7 +38,7 @@ export const tfmt = (k: string, ...args: any[]) => {
     } else if (ch === "{") {
       if (argIdx >= args.length) {
         console.error(
-          `Mismatch trying to format locale string "${k}": expected at least ${argIdx} arguments, but only ${args.length} given.`,
+          `Mismatch trying to format locale string "${k}": expected at least ${argIdx} arguments, but only ${args.length} given.`
         );
         return "N/A";
       }
@@ -51,12 +51,18 @@ export const tfmt = (k: string, ...args: any[]) => {
       // Skip until we meet the closing bracket
       while (i < f.length && f[i] !== "}") ++i;
       if (f[i] !== "}") {
-        console.error(`No matching bracket found while formatting locale fmt string '${f}'`);
+        console.error(
+          `No matching bracket found while formatting locale fmt string '${f}'`
+        );
         return "N/A";
       }
       // Eat the closing bracket
       ++i;
-      if (args[argIdx] !== null && args[argIdx] !== undefined && args[argIdx] !== false) {
+      if (
+        args[argIdx] !== null &&
+        args[argIdx] !== undefined &&
+        args[argIdx] !== false
+      ) {
         res += args[argIdx];
       }
       ++argIdx;
@@ -93,6 +99,8 @@ export const Localizator = (props: { children: any; lang?: string }) => {
   }, [lang]);
   if (localeModule === null) return null;
   return (
-    <LContext.Provider value={{ localeModule: localeModule! }}>{props.children}</LContext.Provider>
+    <LContext.Provider value={{ localeModule: localeModule! }}>
+      {props.children}
+    </LContext.Provider>
   );
 };
