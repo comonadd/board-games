@@ -63,7 +63,7 @@ interface SavedGameState {
   shuffleSeed: number;
 }
 
-interface IQuizGameStore extends SavedGameState {
+export interface IQuizGameStore extends SavedGameState {
   themeStore: ThemeStore;
   questionStore: QuestionStore;
   gameSettings: GameSettings;
@@ -72,7 +72,7 @@ interface IQuizGameStore extends SavedGameState {
 }
 
 // TODO: Maybe load previous game state if user refreshes on accident
-class QuizGameStore implements IQuizGameStore {
+export class QuizGameStore implements IQuizGameStore {
   themeStore;
   questionStore;
   gameSettings;
@@ -180,7 +180,6 @@ class QuizGameStore implements IQuizGameStore {
   }
 
   reshuffleQuestions() {
-    console.log("reshuffling");
     this.shuffleSeed = Math.round(Math.random() * (1 << 30));
   }
 
@@ -247,9 +246,11 @@ class QuizGameStore implements IQuizGameStore {
     });
   };
 
-  finishGame() {
-    this.step = Step.Finished;
-  }
+  finishGame = () => {
+    runInAction(() => {
+      this.step = Step.Finished;
+    });
+  };
 
   async restoreGame(savedState: SavedGameState) {
     await this.loadQuestions();
@@ -273,7 +274,6 @@ class QuizGameStore implements IQuizGameStore {
   }
 
   startGame = async () => {
-    console.log("start game");
     runInAction(() => {
       this.resetGame();
     });

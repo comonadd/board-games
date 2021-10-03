@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { Seconds, Milliseconds } from "~/util";
-import { useQuestions } from "./hooks";
 import {
   Screen,
   ScreenContent,

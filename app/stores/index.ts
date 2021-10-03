@@ -1,11 +1,3 @@
-import { createContext, useContext } from "react";
-import QuizGameStore from "./quizGameStore";
-export { default as QuizGameStore } from "./quizGameStore";
-
-interface IStoreContext {
-  quizGameStore: QuizGameStore;
-}
-
-export const StoreContext = createContext<IStoreContext>({} as any);
-
-export const useStore = () => useContext(StoreContext);
+import quizGameStore from "./quizGameStore";
+import wordsGameStore from "./wordsGameStore";
+export default { quizGameStore, wordsGameStore };
