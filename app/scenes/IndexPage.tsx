@@ -1,7 +1,6 @@
 import React from "react";
 import { List } from "antd";
 import { FileTextOutlined, QuestionOutlined } from "@ant-design/icons";
-import Paper from "@material-ui/core/Paper";
 import paths from "~/paths";
 import { Link } from "react-router-dom";
 import {
@@ -16,22 +15,14 @@ const IndexPage = () => {
       <ScreenContent>
         <ScreenContentHeader title="Choose a game" />
         <List className="index-page-list" itemLayout="vertical">
-          <List.Item
-            className="index-page-list__item"
-            component={Paper}
-            elevation={1}
-          >
+          <List.Item className="index-page-list__item">
             <List.Item.Meta
               avatar={<QuestionOutlined style={{ fontSize: 24 }} />}
               title={<Link to={paths.QUIZ_GAME}>Quiz Game</Link>}
               description={`Try to answer as many thematic questions as possible!`}
             />
           </List.Item>
-          <List.Item
-            className="index-page-list__item"
-            component={Paper}
-            elevation={1}
-          >
+          <List.Item className="index-page-list__item">
             <List.Item.Meta
               avatar={<FileTextOutlined style={{ fontSize: 24 }} />}
               title={

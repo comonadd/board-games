@@ -1,59 +1,29 @@
-import React, { useReducer, useMemo, useRef, useState, useEffect } from "react";
-import Input from "@material-ui/core/Input";
-import Paper from "@material-ui/core/Paper";
+import React from "react";
 import Button from "@material-ui/core/Button";
 import Typography from "@material-ui/core/Typography";
-import ArrowRightAltIcon from "@material-ui/icons/ArrowRightAlt";
-import Grid from "@material-ui/core/Grid";
-import {
-  generateInitialNickname,
-  cn,
-  WSocketState,
-  WSocket,
-  useWSocket,
-} from "~/util";
-import {
-  Screen,
-  ScreenContent,
-  ScreenContentHeader,
-} from "~/components/Screen";
-import { MIN_PLAYERS_FOR_GAME, WS_WORDS_API_URL } from "~/constants";
+import { Screen, ScreenContent } from "~/components/Screen";
 import { t, tfmt } from "~/ln";
-import ErrorOutlineIcon from "@material-ui/icons/ErrorOutline";
-import Immutable, { Map, List } from "immutable";
-import {
-  CWMSG,
-  SWMSG,
-  PlayerId,
-  GameStateDesc,
-  ImmutableMap,
-  PlayerInfo,
-  ClientState,
-  GameState,
-} from "./types";
+import gs from "~/stores/wordsGameStore";
 
-interface GameEndedScreenProps {
-  join: () => void;
-  C: ClientState;
-}
+interface GameEndedScreenProps {}
 
-const GameEndedScreen = ({ join, C }: GameEndedScreenProps) => {
-  const winner = C.get("winner");
-  const myId = C.get("myId");
+const GameEndedScreen = (props: GameEndedScreenProps) => {
+  const winner = gs.winner;
+  const myId = gs.myId;
   return (
     <Screen title="Game Ended">
       <ScreenContent className="flex flex-col game-ended-message flex flex-c">
         <div className="mb-4">
           <Typography component="h1" variant="h5">
             {winner
-              ? winner.get("id") === myId
+              ? winner.id === myId
                 ? t("game-ended-me")
-                : tfmt("game-ended", winner.get("nickname"))
+                : tfmt("game-ended", winner.nickname)
               : "N/A"}
           </Typography>
         </div>
         <Button
-          onClick={join}
+          onClick={gs.rejoin}
           color="primary"
           variant="contained"
           size="large"

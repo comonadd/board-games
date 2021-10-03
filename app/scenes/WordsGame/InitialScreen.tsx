@@ -1,22 +1,22 @@
-import React from "react";
+import React, { useState } from "react";
 import Input from "@material-ui/core/Input";
 import Button from "@material-ui/core/Button";
-import { Screen, ScreenContent } from "~/components/Screen";
+import { Screen, ScreenContentMax } from "~/components/Screen";
 import { t } from "~/ln";
+import { generateInitialNickname } from "~/util";
+import gs from "~/stores/wordsGameStore";
+import { observer } from "mobx-react-lite";
 
-const InitialScreen = (props: {
-  nickname: string;
-  onChange: (v: any) => void;
-  join: () => void;
-}) => {
-  const { nickname, onChange, join } = props;
+const InitialScreen = observer((props: {}) => {
+  const [nickname, setNickname] = useState<string>(generateInitialNickname());
   const canJoin = nickname.length !== 0;
+  const join = () => gs.join(nickname);
   return (
     <Screen title={t("ent-nick")}>
-      <ScreenContent className="flex flex-c">
+      <ScreenContentMax className="flex flex-c">
         <div>
           <Input
-            onChange={onChange}
+            onChange={(e) => setNickname(e.target.value)}
             value={nickname}
             placeholder="Nickname"
             className="mr-2"
@@ -33,9 +33,9 @@ const InitialScreen = (props: {
             {t("join")}
           </Button>
         </div>
-      </ScreenContent>
+      </ScreenContentMax>
     </Screen>
   );
-};
+});
 
 export default InitialScreen;

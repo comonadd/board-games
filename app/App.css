@@ -106,6 +106,13 @@ body {
   flex: 1 1 100%;
 }
 
+.screen-content-max {
+  min-height: 100%;
+  max-height: 100%;
+  max-height: 800px;
+  max-width: 800px;
+}
+
 .question {
   overflow: hidden;
   margin-bottom: 24px;
@@ -414,4 +421,8 @@ body {
 
 .question-status__icon {
   font-size: 24px;
+}
+
+.fch {
+  justify-content: center;
 }

@@ -1,5 +1,3 @@
-import { Map, List } from "immutable";
-
 export enum CWMSG {
   Joining = 0,
   UpdateInput = 1,
@@ -25,29 +23,25 @@ export enum GameStateDesc {
   Starting = 2,
 }
 
-export interface ImmutableMap<T> extends Map<string, any> {
-  get<K extends keyof T>(name: K): T[K];
-}
-
-export type PlayerInfo = ImmutableMap<{
+export type PlayerInfo = {
   nickname: string;
   lives_left: number;
   input: string;
   id: PlayerId;
   letters_left: number[];
-}>;
+};
 
 export type PlayerInfoById = Map<PlayerId, PlayerInfo>;
 
-export type GameState = ImmutableMap<{
+export type GameState = {
   players: PlayerInfoById;
-  whos_turn: PlayerId;
+  whos_turn: PlayerId | null;
   start_timer: number;
   particle: string | null;
   desc: GameStateDesc;
   last_player_to_answer: PlayerId | null;
   all_letters: number[];
-}>;
+};
 
 export enum WordsGameStep {
   Initial = 0,
@@ -77,10 +71,10 @@ export interface ClientAction {
   payload?: any;
 }
 
-export type ClientState = ImmutableMap<{
+export type ClientState = {
   step: WordsGameStep;
   gameState: GameState;
   myId: PlayerId | null;
   winner: PlayerInfo | null;
   wrongGuess: boolean;
-}>;
+};

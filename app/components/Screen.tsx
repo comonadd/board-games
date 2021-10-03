@@ -17,6 +17,29 @@ export const ScreenContent = (props: { children: any; className?: string }) => {
   );
 };
 
+export const ScreenContentMsg = (props: {
+  children: any;
+  className?: string;
+}) => {
+  return (
+    <Card size="small" bordered className={cn(["screen-msg", props.className])}>
+      {props.children}
+    </Card>
+  );
+};
+
+export const ScreenContentMax = (props: {
+  children: any;
+  className?: string;
+}) => {
+  return (
+    <ScreenContent
+      {...props}
+      className={cn([props.className, "screen-content-max"])}
+    />
+  );
+};
+
 export const ScreenContentHeader = (props: {
   title: string;
   children?: any;
