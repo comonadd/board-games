@@ -2,13 +2,21 @@ import React from "react";
 import { version } from "~/../package.json";
 import { Link } from "react-router-dom";
 import { Layout, Menu } from "antd";
+import history from "~/history";
 
 const Header = () => {
   return (
     <Layout.Header className="header">
-      <div className="logo flex flex-c">Quiz Game v{version}</div>
+      <div className="logo flex flex-c" onClick={() => history.push("/")}>
+        Quiz Game v{version}
+      </div>
       <div className="fd" />
-      <Menu theme="dark" mode="horizontal" className="navigation" disabledOverflow>
+      <Menu
+        theme="dark"
+        mode="horizontal"
+        className="navigation"
+        disabledOverflow
+      >
         <Menu.Item key="1">
           <Link to="/quiz" className="nav-item">
             Quiz
