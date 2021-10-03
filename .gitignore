@@ -14,3 +14,5 @@ russian-words/*
 !russian-words/region.csv
 !russian-words/city.csv
 !russian-words/country.csv
+siq-questions/
+questions/

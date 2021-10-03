@@ -1,5 +1,6 @@
 :root {
   --wletter-size: 50px;
+  --primary-color: #51bbfe;
 }
 
 * {
@@ -23,6 +24,7 @@ body {
 
 .theme-grid {
   padding: 16px;
+  max-width: 1000px;
 }
 
 .theme-card {
@@ -37,7 +39,7 @@ body {
 }
 
 .theme-card.theme-card_selected {
-  background-color: green;
+  background-color: var(--primary-color);
 }
 
 .theme-card:hover {
@@ -45,7 +47,7 @@ body {
 }
 
 .theme-card.theme-card_selected:hover {
-  background: red;
+  background: var(--primary-color);
 }
 
 .app {
@@ -72,7 +74,6 @@ body {
 
 .screen-content {
   min-width: 800px;
-  min-height: 600px;
   background: #fff;
   padding: 20px;
   padding-top: 0;
@@ -193,11 +194,11 @@ body {
   display: flex;
   justify-content: space-between;
   padding: 16px;
+  flex-direction: row;
 }
 
-.header nav {
-  display: flex;
-  flex-direction: row;
+.navigation {
+  flex: 1 0 auto;
 }
 
 .header nav > .nav-item {
@@ -207,7 +208,7 @@ body {
 }
 
 .header nav > .nav-item > a {
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .header nav > .nav-item:last-child {
@@ -217,6 +218,12 @@ body {
 .header .logo {
   height: 100%;
   font-size: 24px;
+  flex: 1 0 auto;
+  color: white;
+}
+
+.fd {
+  flex: 1 1 100%;
 }
 
 .a {
@@ -381,4 +388,30 @@ body {
 
 .fs-20 {
   font-size: 20px;
+}
+
+.df {
+  display: flex;
+}
+
+.frr {
+  flex-direction: row-reverse;
+}
+
+.jcsp {
+  justify-content: space-between;
+}
+
+.fc {
+  flex-direction: column;
+}
+
+.question-status {
+  display: flex;
+  flex-direction: row;
+  justify-content: start !important;
+}
+
+.question-status__icon {
+  font-size: 24px;
 }

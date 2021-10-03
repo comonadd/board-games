@@ -10,11 +10,19 @@
     "you": "You",
     "connecting": "Connecting...",
     "failed-to-connect": "Failed to connect",
-    "user-input-answer": "Your answer"
+    "user-input-answer": "Your answer",
+    "answer": "Answer",
+    "skip-question": "Skip question",
+    "restart-game": "Restart the game",
+    "change-settings": "Change settings",
+    "select-themes": "Select themes",
+    "configure-game": "Configure the game",
+    "start-quiz": "Start the quiz"
   },
   "fmt": {
     "waiting-players": "Waiting for players ({}/{})",
     "starting": "Starting... {}",
-    "game-ended": "Game ended. Winner is {}"
+    "game-ended": "Game ended. Winner is {}",
+    "attempts-remaining": "{} attempts remaining"
   }
 }

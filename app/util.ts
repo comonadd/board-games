@@ -41,16 +41,29 @@ export function useLocalStorageState<T>(
 export const range = (start: number, stop: number, step: number) =>
   Array.from({ length: (stop - start) / step + 1 }, (_, i) => start + i * step);
 
-export function shuffleArray<T>(arr: T[]): T[] {
-  let indices = range(0, arr.length - 1, 1);
-  let result = [];
-  while (indices.length !== 0) {
-    let idx = Math.floor(Math.random() * indices.length);
-    const elem = arr[idx];
-    result.push(elem);
-    indices.splice(idx, 1);
+function mulberry32(a: number) {
+  return function () {
+    let t = (a += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const randomRange = (start: number, end: number, seed: number) => {
+  let res = [];
+  const gen = mulberry32(seed);
+  const indicesLeft = range(start, end, 1);
+  for (let i = 0; i <= end - start; ++i) {
+    const idx = gen() * (indicesLeft.length - 1);
+    res.push(indicesLeft.splice(idx, 1)[0]);
   }
-  return result;
+  return res;
+};
+
+export function shuffleArray<T>(arr: T[], seed: number): T[] {
+  let indices = randomRange(0, arr.length - 1, seed);
+  return indices.map((idx) => arr[idx]);
 }
 
 export function randomChoice<T>(arr: T[]): T {
@@ -63,57 +76,6 @@ export const capitalize = (s: string): string =>
 
 export type Milliseconds = number;
 export type Seconds = number;
-
-export interface Timer {
-  reset: () => void;
-  stop: () => void;
-  start: () => void;
-  current: Milliseconds;
-  finished: boolean;
-}
-export const timerSeconds = (t: Timer) => Math.round(t.current / 1000);
-export const useMSTimer = (
-  tickDuration: Milliseconds,
-  countTo: Milliseconds,
-  countDown = true
-): Timer => {
-  const initialTime = countDown ? countTo : 0;
-  const [current, setCurrent] = useState<Milliseconds>(initialTime);
-  const [stopped, setStopped] = useState<boolean>(false);
-  const finished =
-    (countDown && current <= 0) || (!countDown && current >= countTo);
-  useEffect(() => {
-    setTimeout(() => {
-      if (stopped) return;
-      if (finished) {
-        setStopped(true);
-        return;
-      }
-      if (countDown) {
-        setCurrent(current - tickDuration);
-      } else {
-        setCurrent(current + tickDuration);
-      }
-    }, tickDuration);
-  }, [tickDuration, stopped, current]);
-  const reset = () => {
-    setCurrent(initialTime);
-    setStopped(false);
-  };
-  const start = () => {
-    setStopped(false);
-  };
-  const stop = () => {
-    setStopped(true);
-  };
-  return {
-    reset,
-    start,
-    stop,
-    current,
-    finished,
-  };
-};
 
 export enum WSocketState {
   Connecting = 0,
@@ -267,4 +229,16 @@ export const generateInitialNickname = () => {
   const second = capitalize(randomChoice(NICKNAME_PARTICLES_SECOND));
   const num = Math.round(Math.random() * 1000);
   return `${first} ${second} #${num}`;
+};
+
+export const randomColor = () => {
+  return [
+    Math.round(Math.random() * 255),
+    Math.round(Math.random() * 255),
+    Math.round(Math.random() * 255),
+  ];
+};
+
+const randomCSSColor = () => {
+  return `rgb(${randomColor().join(",")})`;
 };
