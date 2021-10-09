@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import Paper from "@material-ui/core/Paper";
+import { Card } from "antd";
 import ArrowRightAltIcon from "@material-ui/icons/ArrowRightAlt";
 import { WSocket } from "~/util";
 import { List } from "immutable";
@@ -13,12 +13,10 @@ interface GameTableProps {}
 const GameTable = observer((props: GameTableProps) => {
   const gameState = gs.gameState;
   const myId = gs.myId;
-  const angle = 360 / gameState.players.size;
-  const circleSize = 300;
   const playersById = gameState.players;
-  const players: List<PlayerInfo> = playersById
-    ? List(playersById.values())
-    : List();
+  const players: PlayerInfo[] = Object.values(playersById);
+  const angle = 360 / players.length;
+  const circleSize = 300;
   const playerIdxById = players.reduce(
     (acc: Record<PlayerId, number>, p, idx) => {
       acc[p.id] = idx;
@@ -27,16 +25,17 @@ const GameTable = observer((props: GameTableProps) => {
     {}
   );
   const renderedPlayers = useMemo(() => {
-    if (players.size === 0) return <div>No players joined yet</div>;
-    if (players.size === 1) {
-      const pid = players.get(0)!.id;
+    if (players.length === 0) return <div>No players joined yet</div>;
+    if (players.length === 1) {
+      const firstPlayer = players[0];
+      const pid = firstPlayer!.id;
       return (
-        <Paper elevation={1} key={pid} className="player-slot">
+        <div key={pid} className="player-slot">
           <TablePlayer
-            player={players.get(0)!}
+            player={firstPlayer!}
             playerTurn={gameState["whos_turn"] === pid}
           />
-        </Paper>
+        </div>
       );
     }
     return players.map((player: PlayerInfo, idx) => {
@@ -54,9 +53,9 @@ const GameTable = observer((props: GameTableProps) => {
         }px) rotate(${-rot}deg)`,
       };
       return (
-        <Paper elevation={1} key={pid} className="player-slot" style={style}>
+        <div elevation={1} key={pid} className="player-slot" style={style}>
           <TablePlayer {...p} />
-        </Paper>
+        </div>
       );
     });
   }, [gameState, myId]);

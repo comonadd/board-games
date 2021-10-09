@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
-import Input from "@material-ui/core/Input";
+import { Input } from "antd";
 import Paper from "@material-ui/core/Paper";
 import { cn } from "~/util";
 import {
@@ -74,7 +74,7 @@ const PlayingScreen = (props: {}) => {
 
   return (
     <Screen title="Playing">
-      <ScreenContent>
+      <ScreenContent className="tp">
         <ScreenContentHeader title={t("in-game")} />
         <GameTable {...props} />
         <Input

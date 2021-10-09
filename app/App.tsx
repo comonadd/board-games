@@ -9,7 +9,6 @@ import Header from "~/components/Header";
 import paths from "./paths";
 import { Localizator } from "./ln";
 import "antd/dist/antd.css";
-import { QuizGameStore, StoreContext } from "~/stores";
 import history from "~/history";
 
 const App = () => {

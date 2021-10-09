@@ -8,15 +8,16 @@ import { MIN_PLAYERS_FOR_GAME } from "~/constants";
 import { t, tfmt } from "~/ln";
 import GameTable from "./GameTable";
 import gs from "~/stores/wordsGameStore";
+import { observer } from "mobx-react-lite";
 
-const WaitingForPlayersScreen = (props: {}) => {
+const WaitingForPlayersScreen = observer((props: {}) => {
   return (
     <Screen title={t("waiting-players")}>
-      <ScreenContent>
+      <ScreenContent style={{ backgroundColor: "transparent" }}>
         <ScreenContentHeader
           title={tfmt(
             "waiting-players",
-            gs.gameState.players.size,
+            gs.playersInLobby,
             MIN_PLAYERS_FOR_GAME
           )}
         />
@@ -24,6 +25,6 @@ const WaitingForPlayersScreen = (props: {}) => {
       </ScreenContent>
     </Screen>
   );
-};
+});
 
 export default WaitingForPlayersScreen;

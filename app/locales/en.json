@@ -17,7 +17,8 @@
     "change-settings": "Change settings",
     "select-themes": "Select themes",
     "configure-game": "Configure the game",
-    "start-quiz": "Start the quiz"
+    "start-quiz": "Start the quiz",
+    "rejoin": "Rejoin"
   },
   "fmt": {
     "waiting-players": "Waiting for players ({}/{})",

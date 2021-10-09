@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { WSocketState, WSocket } from "~/util";
 import {
   ScreenContentMax,
@@ -59,13 +59,13 @@ const GameScreen = observer((props: {}) => {
 });
 
 const WordsGame = observer(() => {
-  console.log("current step", gs.step);
+  useEffect(() => {
+    gs.resetState();
+  }, []);
+  if (gs.socket === null || gs.socket.state === WSocketState.Connecting) {
+    return <ConnectingScreen />;
+  }
   switch (gs.socket.state) {
-    case WSocketState.Connecting:
-      {
-        return <ConnectingScreen />;
-      }
-      break;
     case WSocketState.Closed:
       {
         return <FailedToConnectScreen />;

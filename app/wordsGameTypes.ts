@@ -31,7 +31,7 @@ export type PlayerInfo = {
   letters_left: number[];
 };
 
-export type PlayerInfoById = Map<PlayerId, PlayerInfo>;
+export type PlayerInfoById = Record<PlayerId, PlayerInfo>;
 
 export type GameState = {
   players: PlayerInfoById;

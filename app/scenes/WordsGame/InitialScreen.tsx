@@ -1,7 +1,10 @@
 import React, { useState } from "react";
-import Input from "@material-ui/core/Input";
-import Button from "@material-ui/core/Button";
-import { Screen, ScreenContentMax } from "~/components/Screen";
+import { Space, Row, Col, Button, Input } from "antd";
+import {
+  ScreenContentHeader,
+  Screen,
+  ScreenContentPrompt,
+} from "~/components/Screen";
 import { t } from "~/ln";
 import { generateInitialNickname } from "~/util";
 import gs from "~/stores/wordsGameStore";
@@ -13,27 +16,34 @@ const InitialScreen = observer((props: {}) => {
   const join = () => gs.join(nickname);
   return (
     <Screen title={t("ent-nick")}>
-      <ScreenContentMax className="flex flex-c">
-        <div>
-          <Input
-            onChange={(e) => setNickname(e.target.value)}
-            value={nickname}
-            placeholder="Nickname"
-            className="mr-2"
-            onKeyDown={(e) => {
-              if (e.keyCode === 13 && canJoin) join();
-            }}
-          />
-          <Button
-            disabled={!canJoin}
-            onClick={join}
-            variant="contained"
-            color="primary"
-          >
-            {t("join")}
-          </Button>
-        </div>
-      </ScreenContentMax>
+      <ScreenContentPrompt className="flex flex-c p-4">
+        <ScreenContentHeader title="Enter game" className="flex-s pv-2" />
+        <Row>
+          <Space>
+            <Col xs={24}>
+              <Input
+                onChange={(e) => setNickname(e.target.value)}
+                value={nickname}
+                placeholder="Nickname"
+                className="mr-2"
+                onKeyDown={(e) => {
+                  if (e.keyCode === 13 && canJoin) join();
+                }}
+              />
+            </Col>
+            <Col xs={24}>
+              <Button
+                disabled={!canJoin}
+                onClick={join}
+                type="primary"
+                color="primary"
+              >
+                {t("join")}
+              </Button>
+            </Col>
+          </Space>
+        </Row>
+      </ScreenContentPrompt>
     </Screen>
   );
 });

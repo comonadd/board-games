@@ -1,7 +1,6 @@
 import React from "react";
-import Button from "@material-ui/core/Button";
-import Typography from "@material-ui/core/Typography";
-import { Screen, ScreenContent } from "~/components/Screen";
+import { Button, Typography } from "antd";
+import { Screen, ScreenContentMsg } from "~/components/Screen";
 import { t, tfmt } from "~/ln";
 import gs from "~/stores/wordsGameStore";
 
@@ -12,28 +11,25 @@ const GameEndedScreen = (props: GameEndedScreenProps) => {
   const myId = gs.myId;
   return (
     <Screen title="Game Ended">
-      <ScreenContent className="flex flex-col game-ended-message flex flex-c">
+      <ScreenContentMsg className="p-4">
         <div className="mb-4">
-          <Typography component="h1" variant="h5">
+          <Typography.Text>
             {winner
               ? winner.id === myId
                 ? t("game-ended-me")
                 : tfmt("game-ended", winner.nickname)
               : "N/A"}
-          </Typography>
+          </Typography.Text>
         </div>
         <Button
           onClick={gs.rejoin}
           color="primary"
-          variant="contained"
-          size="large"
-          className="ph-16"
+          type="primary"
+          className="ph-16 w-auto"
         >
-          <Typography component="p" variant="body1" className="fs-16">
-            {t("join")}
-          </Typography>
+          {t("rejoin")}
         </Button>
-      </ScreenContent>
+      </ScreenContentMsg>
     </Screen>
   );
 };

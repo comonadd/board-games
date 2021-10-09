@@ -9,9 +9,17 @@ export const Screen = (props: { title: string; children: any }) => {
   return <div className="screen">{props.children}</div>;
 };
 
-export const ScreenContent = (props: { children: any; className?: string }) => {
+export const ScreenContent = (props: {
+  children: any;
+  style?: Record<string, any>;
+  className?: string;
+}) => {
   return (
-    <Card bordered className={cn(["screen-content", props.className])}>
+    <Card
+      bordered
+      style={props.style ?? {}}
+      className={cn(["screen-content", props.className])}
+    >
       {props.children}
     </Card>
   );
@@ -28,6 +36,8 @@ export const ScreenContentMsg = (props: {
   );
 };
 
+export const ScreenContentPrompt = ScreenContentMsg;
+
 export const ScreenContentMax = (props: {
   children: any;
   className?: string;
@@ -43,12 +53,16 @@ export const ScreenContentMax = (props: {
 export const ScreenContentHeader = (props: {
   title: string;
   children?: any;
+  className?: string;
 }) => {
   return (
-    <div className="screen-content-header">
-      <div className="flex flex-c flex-100">
-        <Typography.Title>{props.title}</Typography.Title>
-      </div>
+    <div
+      className={cn([
+        "screen-content-header flex flex-100 flex-c",
+        props.className,
+      ])}
+    >
+      <Typography.Title>{props.title}</Typography.Title>
       {props.children}
     </div>
   );
