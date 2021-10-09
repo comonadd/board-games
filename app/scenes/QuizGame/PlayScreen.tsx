@@ -10,7 +10,6 @@ import {
   ReloadOutlined,
   SettingOutlined as SettingsIcon,
 } from "@ant-design/icons";
-import { useStore } from "~/stores";
 import { Question } from "~/quizGameTypes";
 import { observer } from "mobx-react-lite";
 import qs from "~/stores/quizGameStore";
@@ -22,6 +21,10 @@ const Play = observer((props: PlayScreenProps) => {
   const questions = qs.questions;
   const reshuffleQuestions = qs.reshuffleQuestions;
   const [userAnswer, setUserAnswer] = useState<string>("");
+
+  useEffect(() => {
+    qs.timer.start();
+  }, []);
 
   const onAnswer = () => {
     qs.answer(userAnswer);

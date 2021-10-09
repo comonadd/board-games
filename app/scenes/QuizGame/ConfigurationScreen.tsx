@@ -2,7 +2,6 @@ import React from "react";
 import { Screen } from "~/components/Screen";
 import { cn } from "~/util";
 import { Button, Space, Col, Card, Typography, Row } from "antd";
-import { useStore } from "~/stores";
 import { observer } from "mobx-react-lite";
 import quizGameStore from "~/stores/quizGameStore";
 import gameSettingsStore from "~/stores/gameSettingsStore";

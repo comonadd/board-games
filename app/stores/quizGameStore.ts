@@ -269,7 +269,6 @@ export class QuizGameStore implements IQuizGameStore {
       this.quizProgress = new Map(savedState.quizProgress);
       this.timer.current = savedState.timer.current;
       this.step = Step.Playing;
-      this.timer.start();
     });
   }
 
@@ -280,7 +279,6 @@ export class QuizGameStore implements IQuizGameStore {
     await this.loadQuestions();
     runInAction(() => {
       this.step = Step.Playing;
-      this.timer.start();
     });
   };
 }
