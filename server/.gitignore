@@ -2,3 +2,4 @@
 .idea
 ./server.dev.log
 venv
+.mypy_cache

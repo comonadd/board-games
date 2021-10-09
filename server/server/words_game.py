@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 import random
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timedelta
@@ -12,28 +11,8 @@ from aiohttp import web
 from aiohttp.http_websocket import WSCloseCode, WSMessage
 from aiohttp.web_ws import WebSocketResponse
 
-# Environment
-DEV = True
-
-# Logging
-logger = logging.getLogger("server")
-
-
-def configure_loggers():
-    f_format = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    if DEV:
-        logger.setLevel(logging.DEBUG)
-        f_handler = logging.FileHandler('server.dev.log')
-        f_handler.setLevel(logging.DEBUG)
-        f_handler.setFormatter(f_format)
-        logger.addHandler(f_handler)
-    else:
-        logger.setLevel(logging.INFO)
-        f_handler = logging.FileHandler('server.prod.log')
-        f_handler.setLevel(logging.INFO)
-        f_handler.setFormatter(f_format)
-        logger.addHandler(f_handler)
-
+from server.logger import logger
+from server.routes import routes
 
 # Settings
 TIME_UNTIL_START = 10
@@ -72,22 +51,30 @@ def load_dictionary(words_dict_path: str, particles_path: str) -> WordGameDict:
         ww.particles = json.load(f)
     ww.particle_keys = list(ww.particles.keys())
     for diff in Difficulty:
-        particles = list(filter(lambda p: ww.particles[p] >= diff.value, ww.particle_keys))
+        particles = list(
+            filter(lambda p: ww.particles[p] >= diff.value, ww.particle_keys)
+        )
         ww.by_difficulty[diff] = particles
         logger.info("Loaded {} difficulty={} words.".format(len(particles), diff))
-    logger.info("Done. Loaded {} words and {} particles".format(len(ww.words), len(ww.particles)))
+    logger.info(
+        "Done. Loaded {} words and {} particles".format(
+            len(ww.words), len(ww.particles)
+        )
+    )
     return ww
 
 
 class CWMSG:
-    """ Client messages. """
+    """Client messages."""
+
     Joining = 0
     UpdateInput = 1
     SubmitGuess = 2
 
 
 class SWMSG:
-    """ Server messages. """
+    """Server messages."""
+
     InitGame = 0
     UpdateGameState = 1
     EndGame = 2
@@ -99,7 +86,8 @@ class SWMSG:
 
 
 class GameStateDesc:
-    """ Description of the current game state. """
+    """Description of the current game state."""
+
     WaitingForPlayers = 0
     Playing = 1
     Starting = 2
@@ -115,9 +103,11 @@ def player_letters_left_initial() -> Set[int]:
         l.add(i)
     return l
 
+
 @dataclass
 class PlayerInfo:
-    """ Information on the current player state. """
+    """Information on the current player state."""
+
     id: int = -1
     lives_left: int = LIVES_INITIAL
     nickname: str = None
@@ -133,7 +123,8 @@ class PlayerInfo:
 
 @dataclass
 class GameState:
-    """ Current game state. Shared between client and server. """
+    """Current game state. Shared between client and server."""
+
     players: Dict[PlayerId, PlayerInfo] = field(default_factory=lambda: {})
     whos_turn: PlayerId = None
     particle: str = None
@@ -146,7 +137,7 @@ class GameState:
     all_letters: List[str] = field(default_factory=player_letters_left_initial)
 
     def to_json(self):
-        players_json = { pid: p.to_json() for pid, p in self.players.items() }
+        players_json = {pid: p.to_json() for pid, p in self.players.items()}
         return {
             **asdict(self),
             "all_letters": list(self.all_letters),
@@ -192,10 +183,7 @@ async def ws_send_to_others(W: ServerState, si: ClientInfo, msg: Message):
 def state_update_msg(W: ServerState, *keys):
     gs = W.game_state
     gsd = gs.to_json()
-    msg = {
-        "type": SWMSG.UpdateGameState,
-        "state": {key: gsd[key] for key in keys}
-    }
+    msg = {"type": SWMSG.UpdateGameState, "state": {key: gsd[key] for key in keys}}
     return msg
 
 
@@ -213,10 +201,11 @@ words_server_state = ServerState()
 
 
 async def wrong_guess(W: ServerState, player: PlayerInfo):
-    await ws_send_to_all(W, { "type": SWMSG.WrongGuess, "id": player.id })
+    await ws_send_to_all(W, {"type": SWMSG.WrongGuess, "id": player.id})
 
 
 reward_random_letters = True
+
 
 async def correct_guess(W: ServerState, player: PlayerInfo, guess: str):
     gs = W.game_state
@@ -232,7 +221,9 @@ async def correct_guess(W: ServerState, player: PlayerInfo, guess: str):
         letter = random.choice(list(player.letters_left))
         player.letters_left.remove(letter)
         logger.debug(f"Random letter rewarded: {letter}")
-    logger.debug(f"player={player.nickname}, letters_left={' '.join(list(map(lambda x: chr(x), player.letters_left)))}")
+    logger.debug(
+        f"player={player.nickname}, letters_left={' '.join(list(map(lambda x: chr(x), player.letters_left)))}"
+    )
     if len(player.letters_left) == 0:
         player.lives_left += 1
         player.letters_left = player_letters_left_initial()
@@ -260,10 +251,12 @@ def particles_dict_for(W: ServerState, diff: Difficulty):
 
 
 def is_guess_correct(W: ServerState, guess: str) -> bool:
-    return len(guess) >= MIN_PARTICLE_LENGTH and \
-           guess in W.ww.words and \
-           not guess in W.game_state.used_words and \
-           W.game_state.particle in guess
+    return (
+        len(guess) >= MIN_PARTICLE_LENGTH
+        and guess in W.ww.words
+        and not guess in W.game_state.used_words
+        and W.game_state.particle in guess
+    )
 
 
 @dataclass
@@ -410,7 +403,9 @@ def is_game_in_progress(gs: GameState):
     return gs.desc == GameStateDesc.Playing
 
 
-async def on_player_joined(W: ServerState, gs: GameState, si: ClientInfo, parsed: Message):
+async def on_player_joined(
+    W: ServerState, gs: GameState, si: ClientInfo, parsed: Message
+):
     if is_game_in_progress(gs):
         await send_to_user(si, {"type": SWMSG.GameInProgress})
         return
@@ -424,8 +419,12 @@ async def on_player_joined(W: ServerState, gs: GameState, si: ClientInfo, parsed
     )
     gs.players[ws_id] = new_player
     await send_to_user(
-        si, {"type": SWMSG.InitGame, "state": gs.to_json(), "player": new_player.to_json()})
-    await ws_send_to_others(W, si, {"type": SWMSG.PlayerJoined, "player": new_player.to_json()})
+        si,
+        {"type": SWMSG.InitGame, "state": gs.to_json(), "player": new_player.to_json()},
+    )
+    await ws_send_to_others(
+        W, si, {"type": SWMSG.PlayerJoined, "player": new_player.to_json()}
+    )
 
     # If we're waiting for players and we have enough players, start the game
     if waiting_for_players(gs) and len(gs.players) >= MIN_PLAYERS_TO_START_GAME:
@@ -437,20 +436,30 @@ async def on_player_joined(W: ServerState, gs: GameState, si: ClientInfo, parsed
         W.game_handle = asyncio.create_task(start_game(W))
 
 
-async def on_player_input(W: ServerState, gs: GameState, si: ClientInfo, parsed: Message):
+async def on_player_input(
+    W: ServerState, gs: GameState, si: ClientInfo, parsed: Message
+):
     # Can't update input if not your turn
     if si.id != gs.whos_turn:
-        logger.warning(f"Player #{si.id} tried to update input during #{gs.whos_turn} player's turn")
+        logger.warning(
+            f"Player #{si.id} tried to update input during #{gs.whos_turn} player's turn"
+        )
         return
     player = gs.players[si.id]
     player.input = parsed["input"]
-    await ws_send_to_all(W, {"type": SWMSG.UserInput, "id": player.id, "input": player.input})
+    await ws_send_to_all(
+        W, {"type": SWMSG.UserInput, "id": player.id, "input": player.input}
+    )
 
 
-async def on_player_submit(W: ServerState, gs: GameState, si: ClientInfo, parsed: Message):
+async def on_player_submit(
+    W: ServerState, gs: GameState, si: ClientInfo, parsed: Message
+):
     # Can't submit guess if not your turn
     if si.id != gs.whos_turn:
-        logger.warning(f"Player #{si.id} tried to submit guess during #{gs.whos_turn} player's turn")
+        logger.warning(
+            f"Player #{si.id} tried to submit guess during #{gs.whos_turn} player's turn"
+        )
         return
     player = gs.players[si.id]
     guess = parsed["guess"]
@@ -511,16 +520,9 @@ def is_user_connected(W: ServerState, pid: PlayerId):
     return W.clients.get(pid, None) is not None
 
 
-###############################
-# Routes
-###############################
-
-routes = web.RouteTableDef()
-
-
-@routes.get('/words/')
+@routes.get("/words/")
 async def words_game(request):
-    """ This route handles the words WebSocket API. """
+    """This route handles the words WebSocket API."""
     ws = web.WebSocketResponse()
     ready = ws.can_prepare(request=request)
     if not ready:
@@ -533,7 +535,7 @@ async def words_game(request):
     # TODO: Maybe also check username?
     if is_user_connected(W, pid):
         logger.warning("User id={} already connected, disconnecting.".format(pid))
-        await ws.close(code=WSCloseCode.TRY_AGAIN_LATER, message=b'Already connected')
+        await ws.close(code=WSCloseCode.TRY_AGAIN_LATER, message=b"Already connected")
         return ws
     # Add user to the client list
     si = ClientInfo(id=pid, socket=ws)
@@ -547,11 +549,13 @@ async def words_game(request):
                 _type = parsed["type"]
                 f = ws_handlers_mapping.get(_type, None)
                 if f is None:
-                    logger.warning("Unknown message type received from client: {}".format(parsed))
+                    logger.warning(
+                        "Unknown message type received from client: {}".format(parsed)
+                    )
                     continue
                 await f(W, gs, si, parsed)
             elif msg.type == aiohttp.WSMsgType.ERROR:
-                logger.error('ws connection closed with exception %s' % ws.exception())
+                logger.error("ws connection closed with exception %s" % ws.exception())
     finally:
         # When a connection is stopped
         # Get rid of the client socket
@@ -561,16 +565,5 @@ async def words_game(request):
     return ws
 
 
-def create_app():
-    configure_loggers()
+def init_words_game():
     words_server_state.ww = load_dictionary(WORDS_DICT_PATH, PARTICLES_PATH)
-    logger.info("Running in {} mode".format("DEV" if DEV else "PROD"))
-    app = web.Application()
-    app.add_routes(routes)
-    logger.debug("new msg")
-    return app
-
-
-if __name__ == '__main__':
-    app = create_app()
-    web.run_app(app, host="127.0.0.1")
