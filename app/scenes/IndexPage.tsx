@@ -1,6 +1,10 @@
 import React from "react";
 import { List } from "antd";
-import { FileTextOutlined, QuestionOutlined } from "@ant-design/icons";
+import {
+  SearchOutlined,
+  FileTextOutlined,
+  QuestionOutlined,
+} from "@ant-design/icons";
 import paths from "~/paths";
 import { Link } from "react-router-dom";
 import {
@@ -31,6 +35,17 @@ const IndexPage = () => {
                 </Link>
               }
               description={`At least two players required. You start with some lives and take turns and the game asks you to find a word that contains the given part. If you answer, you lose one life. If you win, it's the next player's turn. If you use all letters in the alphabet, one life is restore in the alphabet, one life is restored.`}
+            />
+          </List.Item>
+          <List.Item className="index-page-list__item">
+            <List.Item.Meta
+              avatar={<SearchOutlined style={{ fontSize: 24 }} />}
+              title={
+                <Link to={paths.WIKI_GAME} className="mb-2">
+                  Wiki Game
+                </Link>
+              }
+              description={`Currently only Single player. Try to find a path from one Wiki article to another as fast as possible.`}
             />
           </List.Item>
         </List>

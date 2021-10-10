@@ -5,6 +5,7 @@ import IndexPage from "~/scenes/IndexPage";
 import NotFoundPage from "~/scenes/NotFoundPage";
 import QuizGame from "~/scenes/QuizGame";
 import WordsGame from "~/scenes/WordsGame";
+import WikiGame from "~/scenes/WikiGame";
 import Header from "~/components/Header";
 import paths from "./paths";
 import { Localizator } from "./ln";
@@ -21,6 +22,7 @@ const App = () => {
             <Route path={paths.INDEX} exact component={IndexPage} />
             <Route path={paths.QUIZ_GAME} exact component={QuizGame} />
             <Route path={paths.WORDS_GAME} exact component={WordsGame} />
+            <Route path={paths.WIKI_GAME} exact component={WikiGame} />
             <Route path="*" component={NotFoundPage} />
           </Switch>
         </div>

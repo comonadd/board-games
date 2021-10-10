@@ -283,6 +283,8 @@ w-auto {
   font-size: 24px;
   flex: 1 0 auto;
   color: white;
+  user-select: none;
+  cursor: pointer;
 }
 
 .fd {
