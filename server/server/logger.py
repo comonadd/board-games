@@ -5,7 +5,7 @@ from server.env import DEV, LOGS_DIR
 logger = logging.getLogger("server")
 
 
-def configure_loggers():
+def configure_loggers() -> None:
     f_format = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     if DEV:
         logger.setLevel(logging.DEBUG)
