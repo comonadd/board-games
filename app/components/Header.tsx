@@ -1,15 +1,15 @@
 import React from "react";
-import { version } from "~/../package.json";
 import { Link } from "react-router-dom";
 import { Layout, Menu } from "antd";
 import history from "~/history";
+import Logo from "~/components/Logo";
+import paths from "~/paths";
 
-const Header = () => {
+
+  const Header = () => {
   return (
     <Layout.Header className="header">
-      <div className="logo flex flex-c" onClick={() => history.push("/")}>
-        Quiz Game v{version}
-      </div>
+      <Logo />
       <div className="fd" />
       <Menu
         theme="dark"
@@ -18,12 +18,12 @@ const Header = () => {
         disabledOverflow
       >
         <Menu.Item key="1">
-          <Link to="/quiz" className="nav-item">
+          <Link to={paths.QUIZ_GAME} className="nav-item">
             Quiz
           </Link>
         </Menu.Item>
         <Menu.Item key="2">
-          <Link to="/words" className="nav-item">
+          <Link to={paths.WORDS_GAME} className="nav-item">
             Bomb Party Words
           </Link>
         </Menu.Item>
