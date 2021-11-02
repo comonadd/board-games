@@ -12,9 +12,16 @@ import {
 import WSocket, { WSocketState } from "~/WSocket";
 import { PlayerId } from "~/types";
 
+interface Article {
+  path: string;
+  content: string;
+  title: string;
+}
+
 export interface IWikiGameStore {
   isLoading: boolean;
-  currArticle: string | null;
+  currArticle: Article | null;
+  targetArticle: string | null;
 }
 
 interface Player {
@@ -34,6 +41,7 @@ export enum CWMSG {
 export enum SWMSG {
   InitGame = 0,
   NavigateTo = 1,
+  Finished = 2,
 }
 
 export interface ClientMessage extends Record<string, any> {
@@ -44,7 +52,7 @@ export interface ServerMessage extends Record<string, any> {
   type: SWMSG;
 }
 
-enum WGameStep {
+export enum WGameStep {
   Initial = 0,
   EndGame = 1,
   Playing = 2,
@@ -56,6 +64,7 @@ export class WikiGameStore implements IWikiGameStore {
   socket: WSocket<ClientMessage, ServerMessage>;
   player: Player | null = null;
   step: WGameStep = WGameStep.Initial;
+  targetArticle = null;
 
   get isLoading() {
     return this.loading;
@@ -73,6 +82,7 @@ export class WikiGameStore implements IWikiGameStore {
     autorun(() => {
       if (this.socket.state === WSocketState.Opened) {
         this.socket.send({ type: CWMSG.Joining, nickname: "John" });
+        this.loading = true;
       }
     });
   }
@@ -82,23 +92,23 @@ export class WikiGameStore implements IWikiGameStore {
     switch (msg.type) {
       case SWMSG.InitGame:
         {
-          // runInAction(() => {
-          //   this.socket.send({ type: CWMSG.NavigateTo });
-          // });
-          console.log(msg);
+          runInAction(() => {
+            this.targetArticle = msg.target;
+          });
         }
         break;
       case SWMSG.NavigateTo:
         {
           runInAction(() => {
-            this.currArticle = msg.article.content;
+            this.currArticle = msg.article;
+            this.loading = false;
           });
         }
         break;
       case SWMSG.Finished:
         {
           runInAction(() => {
-            this.step = Step.EndGame;
+            this.step = WGameStep.EndGame;
             this.player = msg.player;
           });
         }

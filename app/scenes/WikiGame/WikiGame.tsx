@@ -1,5 +1,5 @@
 import React from "react";
-import wikiStore from "~/stores/wikiStore";
+import wikiStore, { WGameStep } from "~/stores/wikiStore";
 import { observer } from "mobx-react-lite";
 import { Screen, ScreenContentMax } from "~/components/Screen";
 import { Button, Space, Col, Card, Typography, Row } from "antd";
@@ -14,17 +14,28 @@ const WikiGame = observer(() => {
       wikiStore.navigateTo(event.target.pathname);
     }
   };
+  if (wikiStore.step === WGameStep.EndGame) {
+    return <div>You finished at {wikiStore.player!.place}th place</div>;
+  }
   const game = (() => {
     return (
       <Screen title="Wiki Game">
         <Typography.Title className="screen-title">Playing</Typography.Title>
         <ScreenContentMax>
-          {articleContent !== null && (
-            <div
-              className="article-content"
-              dangerouslySetInnerHTML={{ __html: articleContent }}
-              onClick={interceptNavigation}
-            />
+          {wikiStore.loading ? (
+            <div>Loading...</div>
+          ) : (
+            <>
+              <div>Target is: {wikiStore.targetArticle}</div>
+              <Typography.Title>{wikiStore.currArticle!.title}</Typography.Title>
+              {articleContent !== null && (
+                <div
+                  className="article-content"
+                  dangerouslySetInnerHTML={{ __html: articleContent.content }}
+                  onClick={interceptNavigation}
+                />
+              )}
+            </>
           )}
         </ScreenContentMax>
       </Screen>
