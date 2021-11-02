@@ -24,10 +24,7 @@ const TIME_TO_ANSWER: Seconds = 60;
 const POINTS_PER_ANSWER = 100;
 
 // TODO: Maybe use the edit distance to determine correctness?
-const doesAnswerMatchQuestion = (
-  question: Question,
-  answer: string
-): boolean => {
+const doesAnswerMatchQuestion = (question: Question, answer: string): boolean => {
   let userAnswer = answer.toLowerCase();
   const userAnswerWords = userAnswer.split(" ");
   for (const answer of question.answers) {
@@ -94,7 +91,7 @@ export class QuizGameStore implements IQuizGameStore {
     return this.questionStore.selectForTheme(
       this.gameSettings.themes,
       this.gameSettings.shuffleQuestions,
-      this.shuffleSeed
+      this.shuffleSeed,
     );
   }
 
@@ -129,7 +126,7 @@ export class QuizGameStore implements IQuizGameStore {
   constructor(
     gameSettingsStore: GameSettings,
     themeStore: ThemeStore,
-    questionStore: QuestionStore
+    questionStore: QuestionStore,
   ) {
     makeAutoObservable(this);
     this.gameSettings = gameSettingsStore;
@@ -146,8 +143,7 @@ export class QuizGameStore implements IQuizGameStore {
     autorun(() => {
       if (
         this.step === Step.Playing &&
-        (this.remainingAttempts <= 0 ||
-          this.currentQuestionIdx >= this.questions.length)
+        (this.remainingAttempts <= 0 || this.currentQuestionIdx >= this.questions.length)
       ) {
         this.finishGame();
       }
@@ -235,9 +231,7 @@ export class QuizGameStore implements IQuizGameStore {
   nextQuestion = () => {
     runInAction(() => {
       if (this.finished) {
-        console.warn(
-          "Tried to call nextQuestion() when the game is already finished"
-        );
+        console.warn("Tried to call nextQuestion() when the game is already finished");
       } else {
         this.currentQuestionIdx += 1;
         qs.timer.reset();
@@ -262,10 +256,7 @@ export class QuizGameStore implements IQuizGameStore {
       for (let [key, value] of Object.entries(savedState)) {
         (this as any)[key] = (savedState as any)[key];
       }
-      this.timer = new Timer(
-        TIMER_INTERVAL,
-        this.gameSettings.timeToAnswer * 1000
-      );
+      this.timer = new Timer(TIMER_INTERVAL, this.gameSettings.timeToAnswer * 1000);
       this.quizProgress = new Map(savedState.quizProgress);
       this.timer.current = savedState.timer.current;
       this.step = Step.Playing;

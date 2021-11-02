@@ -32,7 +32,7 @@ export class QuestionStore {
   selectForTheme(
     themes: Set<Theme>,
     shuffleQuestions = false,
-    shuffleSeed = 0
+    shuffleSeed = 0,
   ): QuestionWithTheme[] {
     let qst: QuestionWithTheme[] = [];
     themes.forEach((t: Theme) => {
