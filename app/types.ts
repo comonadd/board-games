@@ -3,3 +3,4 @@ export enum Size {
   Medium = 1,
   Large = 2,
 }
+export type PlayerId = number;
