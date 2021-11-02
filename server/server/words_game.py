@@ -24,7 +24,7 @@ from server.words_game_common import (
     SWMSG,
     WordsGameConfig,
 )
-from server.ws_game import ClientInfo, WSGame
+from server.ws_game import ClientInfo, WSGame, Message, MessageHandler
 
 # Settings
 TIME_UNTIL_START = 10
@@ -99,10 +99,6 @@ def load_dictionary(words_dict_path: str, particles_path: str) -> WordGameDict:
         )
     )
     return ww
-
-
-Message = Dict[str, Any]
-MessageHandler = Callable[[ClientInfo, Message], Coroutine[Any, Any, Any]]
 
 
 class WikiGame(WSGame):

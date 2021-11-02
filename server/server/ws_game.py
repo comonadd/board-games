@@ -1,6 +1,7 @@
 import json
 from dataclasses import dataclass
 from typing import Any, Dict
+from typing import Callable, Dict, List, Optional, Set, Any, Coroutine
 
 import aiohttp
 from aiohttp import web
@@ -21,6 +22,9 @@ class ClientInfo:
 
     async def send_json(self, msg: Message) -> None:
         await self.socket.send_json(msg)
+
+
+MessageHandler = Callable[[ClientInfo, Message], Coroutine[Any, Any, Any]]
 
 
 class WSGame:
