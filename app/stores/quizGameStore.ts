@@ -149,15 +149,24 @@ export class QuizGameStore implements IQuizGameStore {
       }
     });
 
-    // try to restore game state from local storage
-    const maybeSavedState = localStorage.getItem("saved-game");
-    if (maybeSavedState !== null) {
-      const savedState: SavedGameState = JSON.parse(maybeSavedState) as any;
-      this.restoreGame(savedState);
-    }
+    autorun(() => {
+      if (this.step === Step.Playing) {
+        // try to restore game state from local storage
+        const maybeSavedState = localStorage.getItem("saved-game");
+        if (maybeSavedState !== null) {
+          const savedState: SavedGameState = JSON.parse(maybeSavedState) as any;
+          this.restoreGame(savedState);
+        }
+      }
+    });
 
     // save game state to Local storage
+    let initialLoad = true;
     autorun(() => {
+      if (initialLoad) {
+        initialLoad = false;
+        return;
+      }
       const gameState = {
         step: this.step,
         timer: this.timer,
